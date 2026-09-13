@@ -1,0 +1,13 @@
+{
+  "name": "monitoramento-prf-pwa",
+  "version": "0.1.0",
+  "description": "Monitoramento de Projetos de Reposição Florestal (PRF) — PWA no Cloudflare Pages + Supabase",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev .",
+    "deploy": "wrangler pages deploy ."
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

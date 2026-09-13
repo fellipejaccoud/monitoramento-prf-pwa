@@ -1,0 +1,14 @@
+{
+  "name": "Monitoramento de PRF",
+  "short_name": "Monit. PRF",
+  "description": "Monitoramento de campo de Projetos de Reposição Florestal — parâmetros DAR, conceito final e relatórios.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8f7",
+  "theme_color": "#1b4332",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoramento de PRF</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1b4332">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --verde-escuro:#1b4332; --verde:#2d6a4f; --verde-claro:#40916c;
+    --bg:#f4f7f5; --card:#ffffff; --borda:#dde5e0; --texto:#1c2620;
+    --texto-suave:#5b6b62; --critico:#b23a2c; --minimo:#b8860b; --adequado:#2d6a4f;
+    --dourado:#d4ac0d;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--texto);-webkit-font-smoothing:antialiased;}
+  header{background:var(--verde-escuro);color:#fff;padding:16px 20px;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 rgba(0,0,0,.08);}
+  header h1{font-size:1.05rem;margin:0;font-weight:700;text-align:center;color:var(--dourado);letter-spacing:.2px;}
+  #pendentes-badge{display:none;text-align:center;font-size:.72rem;background:var(--minimo);color:#fff;padding:4px 0;font-weight:600;}
+  main{max-width:640px;margin:0 auto;padding:14px 14px 40px;}
+  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;position:sticky;top:52px;background:var(--bg);padding:8px 0;z-index:9;}
+  nav.tabs button{flex:1;border:1px solid var(--borda);background:#fff;padding:9px 6px;border-radius:8px;font-size:.7rem;font-weight:600;cursor:pointer;color:var(--texto-suave);transition:.15s;}
+  nav.tabs button:hover{border-color:var(--verde-claro);color:var(--verde-escuro);}
+  nav.tabs button.active{background:var(--verde-escuro);color:#fff;border-color:var(--verde-escuro);}
+  .view{display:none;}
+  .view.active{display:block;animation:fade .2s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+  .card{background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:18px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(27,67,50,.05);}
+  .card .eyebrow{font-size:.64rem;font-weight:800;color:var(--verde-claro);text-transform:uppercase;letter-spacing:.06em;margin:0 0 4px;}
+  .card h2{font-size:.98rem;margin:0 0 4px;color:var(--verde-escuro);}
+  .card .desc{font-size:.76rem;color:var(--texto-suave);margin:0 0 12px;line-height:1.4;}
+  fieldset{border:none;padding:0;margin:0 0 6px;}
+  legend{font-size:.82rem;font-weight:700;color:var(--verde-escuro);padding:0;margin-bottom:8px;}
+  label{display:block;font-size:.76rem;color:var(--texto-suave);margin:12px 0 4px;font-weight:600;}
+  label .req{color:var(--critico);}
+  input[type=text],input[type=number],input[type=email],input[type=tel],select,textarea{
+    width:100%;padding:9px 11px;border:1px solid var(--borda);border-radius:7px;font-size:.9rem;background:#fff;font-family:inherit;transition:border-color .15s;
+  }
+  textarea{resize:vertical;min-height:56px;}
+  input:disabled{background:#f1f3f2;color:var(--texto-suave);}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--verde-claro);outline-offset:1px;border-color:var(--verde-claro);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .btn{background:var(--verde);color:#fff;border:none;padding:11px 18px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:700;margin-top:16px;margin-right:8px;transition:filter .15s,transform .1s;}
+  .btn:hover{filter:brightness(1.08);}
+  .btn:active{transform:scale(.98);}
+  .btn.secundario{background:#fff;color:var(--verde);border:1px solid var(--verde);}
+  .btn.pequeno{padding:7px 12px;font-size:.75rem;margin-top:8px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  details{margin-top:6px;}
+  details summary{font-size:.8rem;color:var(--verde);cursor:pointer;font-weight:600;padding:6px 0;}
+
+  /* passos numerados (Início) */
+  .steps{list-style:none;margin:0;padding:0;counter-reset:step;}
+  .steps li{display:flex;gap:10px;padding:8px 0;font-size:.8rem;line-height:1.45;border-bottom:1px solid #eef2ef;}
+  .steps li:last-child{border-bottom:none;}
+  .steps li::before{counter-increment:step;content:counter(step);flex:none;width:20px;height:20px;border-radius:50%;background:var(--verde-escuro);color:#fff;font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+  .steps.alt li::before{background:var(--verde-claro);}
+  .checklist-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:0;padding:0;list-style:none;}
+  .checklist-grid li{font-size:.78rem;color:var(--texto);padding:4px 0 4px 20px;position:relative;line-height:1.35;}
+  .checklist-grid li::before{content:"✓";position:absolute;left:0;color:var(--verde-claro);font-weight:800;}
+  .tip-card{background:#fff8e6;border:1px solid #f0e0ad;border-radius:10px;padding:12px 14px;font-size:.76rem;line-height:1.5;color:#6b5107;margin-top:10px;}
+  .tip-card b{color:#4d3a05;}
+
+  /* segmented control Crítica/Mínima/Adequada */
+  .dar-param{margin:14px 0;}
+  .dar-param .nome{font-size:.82rem;font-weight:700;color:var(--texto);margin-bottom:6px;}
+  .segmented{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .segmented button{border:1.5px solid var(--borda);background:#fff;padding:9px 4px;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--texto-suave);line-height:1.3;}
+  .segmented button[data-nivel="critica"].on{background:var(--critico);border-color:var(--critico);color:#fff;}
+  .segmented button[data-nivel="minima"].on{background:var(--minimo);border-color:var(--minimo);color:#fff;}
+  .segmented button[data-nivel="adequada"].on{background:var(--adequado);border-color:var(--adequado);color:#fff;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:10px;}
+  .kpi{background:#fafbfa;border:1px solid var(--borda);border-radius:9px;padding:12px 8px;text-align:center;}
+  .kpi .val{font-size:1.35rem;font-weight:800;color:var(--verde-escuro);}
+  .kpi .val.critico{color:var(--critico);} .kpi .val.minimo{color:var(--minimo);} .kpi .val.adequado{color:var(--adequado);}
+  .kpi .lbl{font-size:.63rem;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+
+  .badge-classificacao{display:inline-block;padding:5px 14px;border-radius:20px;font-size:.78rem;font-weight:700;color:#fff;margin-top:10px;}
+  .badge-classificacao.critico{background:var(--critico);}
+  .badge-classificacao.minimo{background:var(--minimo);}
+  .badge-classificacao.adequado{background:var(--adequado);}
+
+  .alerta{background:#fbe9e7;border-left:3px solid var(--critico);color:#7a2318;font-size:.78rem;padding:10px 12px;border-radius:6px;margin-top:10px;line-height:1.4;}
+  .alerta strong{display:block;margin-bottom:2px;}
+
+  .autocomplete{position:relative;}
+  .autocomplete-list{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--borda);border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,.1);max-height:220px;overflow-y:auto;z-index:20;display:none;}
+  .autocomplete-list.show{display:block;}
+  .autocomplete-list .item{padding:8px 11px;font-size:.82rem;cursor:pointer;border-bottom:1px solid #f0f2f0;}
+  .autocomplete-list .item:hover{background:#eef4f1;}
+  .autocomplete-list .item .cientifico{font-style:italic;color:var(--verde-escuro);}
+  .autocomplete-list .item .popular{color:var(--texto-suave);font-size:.72rem;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .chip{background:#eef4f1;border:1px solid var(--verde-claro);color:var(--verde-escuro);font-size:.74rem;padding:4px 8px 4px 10px;border-radius:16px;display:flex;align-items:center;gap:6px;}
+  .chip button{background:none;border:none;color:var(--verde-escuro);cursor:pointer;font-size:.85rem;padding:0;line-height:1;}
+
+  .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .thumbs img{width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--borda);}
+  .hint{font-size:.72rem;color:var(--texto-suave);margin-top:4px;line-height:1.4;}
+  .checkbox-linha{display:flex;align-items:center;gap:8px;font-weight:normal;margin-top:14px;}
+  .checkbox-linha input[type="checkbox"]{width:18px;height:18px;flex-shrink:0;margin:0;}
+
+  .foto-ponto{padding:10px 0;border-bottom:1px solid #eef2ef;}
+  .foto-ponto:last-child{border-bottom:none;}
+  .thumb-wrap{position:relative;display:inline-block;}
+  .thumb-remove{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--critico);color:#fff;border:2px solid #fff;font-size:.7rem;line-height:1;cursor:pointer;padding:0;}
+  .foto-picker{display:none;flex-wrap:wrap;gap:6px;margin-top:8px;padding:8px;background:#fafbfa;border:1px dashed var(--borda);border-radius:8px;}
+  .foto-picker.show{display:flex;}
+  .thumb-pick{width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid transparent;cursor:pointer;opacity:.55;touch-action:manipulation;display:block;}
+  .thumb-pick.selecionada{opacity:1;border-color:var(--verde-claro);}
+  .thumb-pick-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .thumb-pick-check{font-size:.62rem;font-weight:800;color:var(--verde-claro);white-space:nowrap;}
+  .msg{font-size:.8rem;padding:9px 11px;border-radius:7px;margin-top:10px;font-weight:600;}
+  .msg.ok{background:#e7f0ec;color:var(--verde-escuro);}
+  .msg.erro{background:#fbe9e7;color:var(--critico);}
+
+  .ref-card{background:#eef4f1;border-radius:10px;padding:14px 16px;font-size:.78rem;line-height:1.6;color:var(--texto);}
+  .ref-card b{color:var(--verde-escuro);}
+  .ref-card ul{margin:6px 0;padding-left:18px;}
+
+  footer{text-align:center;font-size:.68rem;color:var(--texto-suave);padding:24px 0 10px;}
+
+  #mapa-leaflet{width:100%;height:360px;border-radius:10px;margin-top:10px;border:1px solid var(--borda);background:#eef2ef;}
+  .leaflet-popup-content{font-size:.8rem;}
+  .marcador-destaque{filter:hue-rotate(140deg) saturate(4) brightness(1.1);}
+
+  /* Login por e-mail */
+  .login-gate{position:fixed;inset:0;background:var(--verde-escuro);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100;overflow-y:auto;}
+  .login-card{background:#fff;border-radius:14px;padding:26px 22px;max-width:360px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.25);margin:auto;}
+  .login-card h2{margin:0 0 6px;color:var(--verde-escuro);font-size:1.05rem;}
+  .login-card .desc{font-size:.8rem;color:var(--texto-suave);margin:0 0 16px;line-height:1.4;}
+  #user-bar{display:none;align-items:center;justify-content:center;gap:10px;background:#eef4f1;padding:6px 12px;font-size:.72rem;color:var(--verde-escuro);}
+  #user-bar button{background:none;border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:3px 10px;font-size:.7rem;cursor:pointer;font-weight:600;}
+
+  /* Explicação de situação (Crítica/Mínima/Adequada) por parâmetro */
+  .explicacao-situacao{display:none;background:#eef4f1;border-left:3px solid var(--verde-claro);border-radius:6px;padding:9px 11px;font-size:.76rem;line-height:1.45;color:var(--texto);margin-top:8px;}
+  .explicacao-situacao.show{display:block;}
+  .explicacao-situacao b{color:var(--verde-escuro);}
+
+  /* Painel de pontos já lançados */
+  .pontos-lancados{margin-top:14px;border-top:1px solid var(--borda);padding-top:10px;}
+  .pontos-lancados-lista{max-height:170px;overflow-y:auto;}
+  .ponto-lancado-item{display:flex;justify-content:space-between;gap:8px;font-size:.74rem;padding:6px 0;border-bottom:1px solid #f0f2f0;color:var(--texto-suave);}
+  .ponto-lancado-item b{color:var(--texto);}
+  .revisao-item{border:1px solid var(--borda);border-radius:10px;padding:10px;margin-bottom:8px;font-size:.8rem;}
+  .revisao-item .resumo{color:var(--texto-suave);margin-bottom:8px;}
+  .revisao-item .acoes{display:flex;gap:8px;}
+  .revisao-item .acoes .btn,.revisao-item .acoes .btn.secundario{margin-top:0;flex:1;padding:8px;font-size:.78rem;}
+
+  /* Acessibilidade — tamanho do texto. Escala o font-size da raiz; como o resto da folha de
+     estilos usa "rem" pra praticamente todo texto, isso aumenta tudo proporcionalmente, sem
+     precisar de regra própria em cada elemento e sem quebrar o layout (que já é flex/grid fluido). */
+  html[data-fonte="grande"]{font-size:118%;}
+  html[data-fonte="enorme"]{font-size:136%;}
+  .fonte-opcoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .fonte-btn{margin-top:0;flex:1;min-width:88px;}
+  .fonte-btn.on{background:var(--verde);color:#fff;border-color:var(--verde);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sistema de Monitoramento de PRF</h1>
+</header>
+<div id="user-bar"><span id="user-email"></span><button type="button" id="btn-logout">Sair</button></div>
+<div id="pendentes-badge"></div>
+
+<div class="login-gate" id="login-gate">
+  <div class="login-card">
+    <h2 id="login-titulo">Entrar</h2>
+    <p class="desc" id="login-desc">Digite seu e-mail e senha. Qualquer e-mail serve, não precisa ser institucional.</p>
+    <label>E-mail</label>
+    <input type="email" id="login-email" placeholder="seuemail@exemplo.com" autocomplete="email">
+    <label>Senha</label>
+    <input type="password" id="login-senha" placeholder="Sua senha" autocomplete="current-password">
+    <div id="login-confirma-wrap" style="display:none;">
+      <label>Confirme a senha</label>
+      <input type="password" id="login-senha-confirma" placeholder="Repita a senha" autocomplete="new-password">
+    </div>
+    <button type="button" class="btn" id="btn-login" style="width:100%;">Entrar</button>
+    <button type="button" class="btn" id="btn-cadastrar" style="width:100%;display:none;">Criar conta</button>
+    <div id="login-msg"></div>
+    <p class="hint" style="text-align:center;margin-top:12px;"><a href="#" id="link-alternar-modo">Ainda não tem conta? Cadastre-se</a></p>
+    <p class="hint" style="text-align:center;"><a href="#" id="link-esqueci-senha">Esqueci minha senha</a></p>
+    <p class="hint" style="margin-top:14px;"><b>Importante:</b> faça login uma vez com internet — de preferência antes de ir a campo. Depois disso o app continua funcionando offline; só a sincronização com o servidor precisa de sinal.</p>
+  </div>
+</div>
+
+<div class="login-gate" id="nova-senha-gate" style="display:none;">
+  <div class="login-card">
+    <h2>Defina sua nova senha</h2>
+    <p class="desc">Você clicou num link de redefinição de senha. Escolha uma senha nova antes de continuar.</p>
+    <form id="form-nova-senha">
+      <label>Nova senha</label>
+      <input type="password" id="ns-senha" required autocomplete="new-password">
+      <label>Confirme a nova senha</label>
+      <input type="password" id="ns-senha-confirma" required autocomplete="new-password">
+      <button type="submit" class="btn" style="width:100%;">Salvar nova senha</button>
+    </form>
+    <div id="nova-senha-msg"></div>
+  </div>
+</div>
+
+<div class="login-gate" id="perfil-gate" style="display:none;">
+  <div class="login-card">
+    <h2>Complete seu cadastro</h2>
+    <p class="desc">Só na primeira vez — esses dados entram automaticamente na assinatura de cada relatório gerado.</p>
+    <form id="form-perfil-inicial">
+      <label>Nome completo <span class="req">*</span></label>
+      <input type="text" id="pf-nome" required>
+      <label>Matrícula</label>
+      <input type="text" id="pf-matricula">
+      <label>Setor</label>
+      <input type="text" id="pf-setor">
+      <label>Formação profissional</label>
+      <input type="text" id="pf-formacao" placeholder="Ex: Engenheiro Florestal, Biólogo...">
+      <button type="submit" class="btn" style="width:100%;">Enviar cadastro</button>
+    </form>
+    <div id="perfil-inicial-msg"></div>
+  </div>
+</div>
+
+<div class="login-gate" id="aguardando-gate" style="display:none;">
+  <div class="login-card">
+    <h2>Cadastro enviado</h2>
+    <p class="desc">Seu acesso está aguardando aprovação de um administrador. Assim que for liberado, você consegue entrar normalmente — não precisa se cadastrar de novo.</p>
+    <button type="button" class="btn secundario" id="btn-verificar-aprovacao" style="width:100%;">Verificar novamente</button>
+    <div id="aguardando-msg"></div>
+  </div>
+</div>
+
+<main>
+  <nav class="tabs">
+    <button data-view="inicio" class="active">Início</button>
+    <button data-view="processo">Processo</button>
+    <button data-view="ponto">Ponto de Obs.</button>
+    <button data-view="mapa">Mapa</button>
+    <button data-view="metricas">Relatório</button>
+  </nav>
+
+  <!-- INÍCIO -->
+  <section id="view-inicio" class="view active">
+    <div class="card">
+      <p class="eyebrow">Acessibilidade</p>
+      <h2>Tamanho do texto</h2>
+      <p class="desc">Ajusta o tamanho de todo o texto do app, sem quebrar o layout — útil pra tela do celular em campo, sob sol ou com vista cansada.</p>
+      <div class="fonte-opcoes" role="group" aria-label="Tamanho do texto">
+        <button type="button" class="btn secundario pequeno fonte-btn" data-fonte="padrao">A Padrão</button>
+        <button type="button" class="btn secundario pequeno fonte-btn" data-fonte="grande">A Grande</button>
+        <button type="button" class="btn secundario pequeno fonte-btn" data-fonte="enorme">A Muito grande</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Passo a passo</p>
+      <h2>Como usar este app</h2>
+      <p class="desc">Segue as 3 etapas do Manual de Monitoramento do INEA (2016): planejamento, campo e análise. Este app cobre principalmente a etapa de campo e a análise — o planejamento espacial (shapefile, GPS) continua sendo feito à parte, no seu GIS de costume.</p>
+      <ol class="steps">
+        <li><div><b>Planejamento.</b> Confira o polígono do projeto, separe a lista de espécies previstas e o checklist de equipamentos abaixo antes de ir a campo.</div></li>
+        <li><div><b>Campo.</b> Percorra o polígono e registre cada ponto de observação na aba <b>Ponto de Obs.</b> — parâmetros, GPS, espécies e fotos com data/hora.</div></li>
+        <li><div><b>Análise.</b> Na aba <b>Relatório</b>, acompanhe o conceito final, os alertas do protocolo e exporte o PDF e o Excel para o processo.</div></li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Protocolo DAR</p>
+      <h2>Diagnóstico Ambiental Rápido</h2>
+      <p class="desc">Resumo prático das regras do método (Manual INEA, seção 4.3.2 e Anexo II). O app aplica tudo isso automaticamente ao calcular o conceito final — esta é só a referência rápida.</p>
+      <div class="ref-card">
+        <b>Conceito final</b> = média dos somatórios dos pontos × (10 / 7)<br><br>
+        <b>Faixas:</b>
+        <ul>
+          <li>0,0 – 4,9 → <b style="color:var(--critico)">Crítico</b> — refazer a implantação</li>
+          <li>5,0 – 7,9 → <b style="color:var(--minimo)">Mínimo</b> — ações corretivas necessárias</li>
+          <li>8,0 – 10,0 → <b style="color:var(--adequado)">Adequado</b> — apto para quitação</li>
+        </ul>
+        <b>Atenção:</b> nenhum parâmetro pode ter nota crítica (0) em nenhum ponto — se acontecer, o processo não pode ser considerado apto, mesmo com conceito ≥ 8,0. Atrativos de fauna e Riqueza aparente são cumulativos: contam-se as novidades a cada ponto e a classificação final vale para o polígono inteiro.
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Manual INEA — seção 3.2</p>
+      <h2>Critérios para os pontos de observação</h2>
+      <p class="desc">Cada ponto cobre um raio de observação de até 20m ao redor do avaliador. O número de pontos é calculado automaticamente ao cadastrar o processo — IA = (área − 1) + 5, com teto de 50 — mas onde caminhar e onde parar é decisão do técnico em campo:</p>
+      <ul class="checklist-grid" style="grid-template-columns:1fr;">
+        <li>Percorra a maior parte do polígono, cruzando o maior eixo da área — não avalie só perto da entrada.</li>
+        <li>Distribua os pontos para representar a heterogeneidade da área (partes boas e ruins do plantio).</li>
+        <li>A escolha da rota e dos pontos é do técnico avaliador — não precisa repetir os pontos de um relatório do empreendedor.</li>
+        <li>Comece cedo: luz mais fraca e sol a pino atrapalham tanto a observação quanto as fotos.</li>
+      </ul>
+      <div class="tip-card"><b>Leve para o campo:</b> celular/GPS com bateria, protetor solar, repelente, água, chapéu/boné e prancheta com a ficha impressa como reserva. No DAR não se demarca fisicamente o ponto nem se usa trena — altura, cobertura de copa e os demais parâmetros são estimativa visual a partir do ponto georreferenciado (isso é coisa do método DER, com suas parcelas de 25×4m).</div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Manual INEA — seção 3.4</p>
+      <h2>Registro fotográfico</h2>
+      <p class="desc">Recomenda-se ao menos <b>4 fotos por ponto</b>, uma para cada direção cardeal (Norte, Sul, Leste, Oeste) — é exatamente o que a aba Relatório tenta montar automaticamente no mosaico. Cuide do enquadramento e da luz; evite fotos muito abertas (sem contexto) ou muito fechadas (só folhagem, sem mostrar a situação do ponto).</p>
+      <div class="tip-card"><b>Importante sobre o horário da foto:</b> o mosaico casa as fotos com os pontos pela data/hora gravada no próprio arquivo (EXIF) — use a câmera nativa do celular ou um app de carimbo de data/hora tipo <b>Timestamp Camera</b> (ou similar). Fotos reenviadas por WhatsApp perdem essa informação; nesse caso, use "Escolher fotos manualmente" no ponto correspondente, na aba Relatório.</div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Antes de ir a campo</p>
+      <h2>Checklist de equipamentos</h2>
+      <ul class="checklist-grid">
+        <li>GPS ou celular com localização</li>
+        <li>Ficha impressa de reserva</li>
+        <li>Câmera / celular carregado</li>
+        <li>Protetor solar</li>
+        <li>Repelente de insetos</li>
+        <li>Água</li>
+        <li>Botas e vestuário adequado</li>
+        <li>Lista de espécies do projeto</li>
+        <li>Número do processo administrativo</li>
+      </ul>
+      <p class="hint">Sem trena, fita zebrada ou estacas — isso é equipamento do método DER (parcelas de 25×4m), não do DAR. No DAR, o ponto de observação é só georreferenciado; os parâmetros são avaliação visual.</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Assinatura do relatório</p>
+      <h2>Dados do técnico avaliador</h2>
+      <p class="desc">Preenchido no primeiro acesso — entra automaticamente no cabeçalho de cada relatório, no mesmo bloco "Identificação do técnico avaliador" da ficha oficial (Anexo II). Pode corrigir aqui quando precisar.</p>
+      <form id="form-tecnico">
+        <label>Nome completo</label>
+        <input type="text" id="t-nome">
+        <div class="row2">
+          <div><label>Matrícula</label><input type="text" id="t-matricula"></div>
+          <div><label>Setor</label><input type="text" id="t-setor"></div>
+        </div>
+        <label>Formação profissional</label>
+        <input type="text" id="t-formacao" placeholder="Ex: Engenheiro Florestal, Biólogo...">
+        <button type="submit" class="btn pequeno">Salvar dados</button>
+      </form>
+      <div id="tecnico-msg"></div>
+    </div>
+  </section>
+
+  <!-- ADICIONAR PROCESSO -->
+  <section id="view-processo" class="view">
+    <div class="card">
+      <h2 id="processo-form-titulo">Adicionar Processo</h2>
+      <label>Corrigir um processo já cadastrado</label>
+      <select id="p-editar-select">
+        <option value="">— Novo processo —</option>
+      </select>
+      <p class="hint">Selecione um processo aqui para carregar os dados e corrigir; deixe em "Novo processo" para cadastrar um processo diferente.</p>
+      <form id="form-processo">
+        <input type="hidden" id="p-id-edicao">
+        <fieldset>
+          <legend>Identificação do processo</legend>
+          <label>N. do processo administrativo <span class="req">*</span></label>
+          <input type="text" id="p-numero" required placeholder="Ex: E-07/002.904/2018">
+          <p class="hint">Formato do INEA: letra-número/número.número/ano. É o identificador único do projeto — usado para achar o processo em todas as telas.</p>
+
+          <label>Formação vegetacional <span class="req">*</span></label>
+          <select id="p-formacao" required>
+            <option value="" disabled selected>Selecione</option>
+            <option>Pastagens</option>
+            <option>Capoeira</option>
+            <option>Florestas</option>
+            <option>Outros</option>
+          </select>
+
+          <div class="row2">
+            <div><label>Área (hectares) <span class="req">*</span></label><input type="number" id="p-area" step="0.01" min="0" required></div>
+            <div><label>N de pontos (calculado)</label><input type="text" id="p-num-pontos" disabled value="—"></div>
+          </div>
+
+          <label>Arquivo KML — polígono da área de plantio e/ou pontos planejados (opcional)</label>
+          <input type="file" id="p-kml" accept=".kml">
+          <p class="hint">Se enviado aqui, já fica disponível na aba Mapa assim que este processo for selecionado — não precisa importar de novo lá. Pode enviar depois, direto na aba Mapa, se preferir.</p>
+
+          <label class="checkbox-linha">
+            <input type="checkbox" id="p-publico">
+            Tornar este processo visível no mapa público (WebGIS)
+          </label>
+          <p class="hint">Sem marcar, o processo continua visível só pra você, como hoje. Quando marcado, a localização e o polígono ficam públicos — nenhum dado do requerente ou do índice DAR é exibido lá.</p>
+        </fieldset>
+
+        <details>
+          <summary>Identificação do requerente (opcional)</summary>
+          <fieldset>
+            <label>Razão social</label>
+            <input type="text" id="p-razao-social">
+            <label>CPF/CNPJ</label>
+            <input type="text" id="p-cpf-cnpj">
+            <label>Endereço</label>
+            <input type="text" id="p-endereco">
+            <div class="row2">
+              <div><label>Complemento</label><input type="text" id="p-complemento"></div>
+              <div><label>Município</label><input type="text" id="p-municipio"></div>
+            </div>
+            <label>CEP</label>
+            <input type="text" id="p-cep">
+            <label>Contato — nome</label>
+            <input type="text" id="p-contato-nome">
+            <div class="row2">
+              <div><label>Telefone</label><input type="tel" id="p-contato-telefone"></div>
+              <div><label>E-mail</label><input type="email" id="p-contato-email"></div>
+            </div>
+          </fieldset>
+        </details>
+
+        <button type="submit" class="btn" id="btn-salvar-processo">Salvar processo</button>
+        <button type="button" class="btn secundario" id="btn-cancelar-edicao-processo" style="display:none;">Cancelar edição</button>
+      </form>
+      <div id="processo-msg"></div>
+    </div>
+  </section>
+
+  <!-- ADICIONAR PONTO DE OBSERVAÇÃO -->
+  <section id="view-ponto" class="view">
+    <div class="card">
+      <h2 id="ponto-form-titulo">Adicionar Ponto de Observação</h2>
+      <form id="form-ponto">
+        <input type="hidden" id="pt-id-edicao" value="">
+        <label>N. do processo administrativo <span class="req">*</span></label>
+        <select id="pt-processo" required></select>
+        <p class="hint" id="pt-restantes"></p>
+        <p class="hint" id="pt-conceito-parcial"></p>
+        <div class="pontos-lancados" id="pt-lancados-painel" style="display:none;">
+          <div class="nome" style="font-size:.78rem;">Pontos já lançados neste processo</div>
+          <div class="pontos-lancados-lista" id="pt-lancados-lista"></div>
+        </div>
+
+        <div class="dar-param" data-param="necessidade_replantio">
+          <div class="nome">Necessidade de replantio</div>
+          <div class="segmented">
+            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
+            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
+            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+          </div>
+          <div class="explicacao-situacao"></div>
+        </div>
+
+        <div class="dar-param">
+          <div class="nome">Atrativos de fauna — cumulativo do processo</div>
+          <p class="hint" id="pt-atrativos-acumulado">Cumulativo do processo até agora: 0 → classificação: Crítica (0)</p>
+          <label>Espécies com atrativos (flores/frutos) observadas neste ponto</label>
+          <div class="autocomplete">
+            <input type="text" id="pt-fauna-busca" placeholder="Buscar por nome popular...">
+            <div class="autocomplete-list" id="pt-fauna-lista"></div>
+          </div>
+          <div class="chips" id="pt-fauna-chips"></div>
+          <p class="hint" id="pt-fauna-ja-observadas"></p>
+          <p class="hint">Cada espécie adicionada aqui também entra automaticamente na Riqueza aparente abaixo — é a mesma espécie contada nos dois critérios cumulativos. Espécies já contadas em pontos anteriores deste processo não aparecem mais na busca.</p>
+        </div>
+
+        <div class="dar-param" data-param="cobertura_copa">
+          <div class="nome">Cobertura de copa</div>
+          <div class="segmented">
+            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
+            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
+            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+          </div>
+          <div class="explicacao-situacao"></div>
+        </div>
+
+        <div class="dar-param" data-param="distribuicao_especies">
+          <div class="nome">Distribuição das espécies</div>
+          <div class="segmented">
+            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
+            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
+            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+          </div>
+          <div class="explicacao-situacao"></div>
+        </div>
+
+        <div class="dar-param">
+          <div class="nome">Riqueza aparente — cumulativo do processo</div>
+          <p class="hint" id="pt-riqueza-acumulado">Cumulativo do processo até agora: 0 → classificação: Crítica (0)</p>
+          <label>Espécies vegetais observadas neste ponto</label>
+          <div class="autocomplete">
+            <input type="text" id="pt-vegetal-busca" placeholder="Buscar por nome popular...">
+            <div class="autocomplete-list" id="pt-vegetal-lista"></div>
+          </div>
+          <div class="chips" id="pt-vegetal-chips"></div>
+          <p class="hint" id="pt-vegetal-ja-observadas"></p>
+        </div>
+
+        <div class="dar-param" data-param="altura_estimada">
+          <div class="nome">Altura estimada</div>
+          <div class="segmented">
+            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
+            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
+            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+          </div>
+          <div class="explicacao-situacao"></div>
+        </div>
+
+        <div class="dar-param" data-param="competicao">
+          <div class="nome">Competição</div>
+          <div class="segmented">
+            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
+            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
+            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+          </div>
+          <div class="explicacao-situacao"></div>
+        </div>
+
+        <label>Observações</label>
+        <textarea id="pt-observacoes" placeholder="Anotações livres sobre o ponto..."></textarea>
+
+        <label>Posição geográfica</label>
+        <div class="row2">
+          <div><input type="number" id="pt-lat" step="0.000001" placeholder="Latitude"></div>
+          <div><input type="number" id="pt-lng" step="0.000001" placeholder="Longitude"></div>
+        </div>
+        <button type="button" class="btn secundario pequeno" id="btn-gps">Capturar GPS automaticamente</button>
+        <p class="hint">Ou digite as coordenadas manualmente acima — útil se o sinal de GPS estiver fraco em campo.</p>
+        <label>Ou selecione um ponto já importado do KML (aba Mapa)</label>
+        <select id="pt-kml-select"><option value="">— Nenhum —</option></select>
+        <p class="hint">Ao salvar o ponto com uma coordenada do KML selecionada, ele some desta lista — assim dá pra acompanhar quais pontos planejados ainda faltam visitar.</p>
+
+        <button type="submit" class="btn" id="btn-salvar-ponto">Salvar ponto</button>
+        <button type="button" class="btn secundario" id="btn-cancelar-edicao-ponto" style="display:none;">Cancelar edição</button>
+      </form>
+      <div id="ponto-msg"></div>
+    </div>
+  </section>
+
+  <!-- MAPA -->
+  <section id="view-mapa" class="view">
+    <div class="card">
+      <h2>Mapa dos pontos de observação</h2>
+      <p class="desc">Importe um arquivo KML com os pontos já distribuídos em campo e/ou o contorno da área de plantio (exportado do seu GPS ou GIS) — o mesmo arquivo pode trazer os dois de uma vez. O mapa fica salvo neste aparelho — depois de abrir uma vez com sinal, continua disponível offline na mesma área.</p>
+      <label>N. do processo administrativo</label>
+      <select id="mapa-processo"></select>
+      <label>Arquivo KML</label>
+      <input type="file" id="mapa-kml" accept=".kml">
+      <div id="mapa-kml-msg"></div>
+      <div class="row2" style="margin-top:10px;">
+        <div>
+          <label>Ir para o ponto</label>
+          <select id="mapa-goto"><option value="">Selecione um ponto</option></select>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button type="button" class="btn secundario" id="btn-goto-point" style="width:100%;margin-top:0;">Go to point</button>
+        </div>
+      </div>
+      <div id="mapa-leaflet"></div>
+      <p class="hint">O ponto de destino aparece em destaque (marcador dourado) até você escolher outro. Contorno roxo = área de plantio (do KML); pino azul = ponto planejado; círculo verde = ponto já avaliado em campo. Use o ícone de camadas no canto do mapa para ligar referências oficiais do INEA/GERGET (APPs, hidrografia, unidades de conservação, uso e cobertura do solo) — desligadas por padrão pra economizar dados em campo.</p>
+      <div id="mapa-navegacao" style="display:none;margin-top:10px;">
+        <p class="hint" id="mapa-distancia" style="font-weight:700;font-size:.85rem;color:var(--verde-escuro);"></p>
+        <button type="button" class="btn secundario pequeno" id="btn-parar-navegacao">Parar navegação</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MÉTRICAS / RELATÓRIO -->
+  <section id="view-metricas" class="view">
+    <div class="card">
+      <h2>Conceito Final</h2>
+      <label>N. do processo administrativo</label>
+      <select id="m-processo"></select>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="val" id="m-media">—</div><div class="lbl">Média das notas</div></div>
+        <div class="kpi"><div class="val" id="m-fator">1,43</div><div class="lbl">Fator</div></div>
+        <div class="kpi"><div class="val" id="m-conceito">—</div><div class="lbl">Conceito final</div></div>
+        <div class="kpi"><div class="val" id="m-pontos">—</div><div class="lbl">Pontos avaliados / total</div></div>
+      </div>
+      <p class="hint" id="m-esforco-amostral"></p>
+      <div id="m-classificacao"></div>
+      <div id="m-alertas"></div>
+    </div>
+
+    <div class="card" id="m-revisao-card" style="display:none;">
+      <h2>Revisão antes de enviar</h2>
+      <p class="desc">Pontos salvos neste aparelho que ainda não foram para o banco de dados — confira os dados abaixo antes de enviar. Só sobem quando você confirmar (aqui, ponto a ponto, ou todos de uma vez).</p>
+      <div id="m-revisao-lista"></div>
+      <button type="button" class="btn" id="btn-confirmar-todos-pontos" style="margin-top:10px;">Confirmar e enviar todos</button>
+      <div id="m-revisao-msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Espécies observadas na vistoria</h2>
+      <p class="desc">Consolidado de todas as espécies registradas em qualquer ponto deste processo.</p>
+      <div id="m-especies"></div>
+    </div>
+
+    <div class="card">
+      <h2>Mosaico de fotos por horário</h2>
+      <p class="desc">Selecione o bloco de fotos tiradas em campo com um app de carimbo de data/hora (ex.: Timestamp Camera, ou similar) — pode selecionar em mais de uma vez, as fotos se acumulam. O app propõe até 2 fotos por ponto pelo horário (a mais próxima do momento do registro); quando a foto não tem data/hora (comum em reenvios por WhatsApp) ou o horário não bate por causa do deslocamento entre pontos, atribua manualmente — o limite de 2 por ponto vale também na atribuição manual. Tudo entra no PDF exportado.</p>
+      <input type="file" id="m-fotos" multiple accept="image/*">
+      <button type="button" class="btn secundario pequeno" id="btn-limpar-fotos">Limpar fotos carregadas</button>
+      <div id="m-fotos-resultado"></div>
+    </div>
+
+    <div class="card">
+      <h2>Exportar</h2>
+      <button class="btn" id="btn-exportar-pdf">Exportar PDF</button>
+      <button class="btn secundario" id="btn-exportar-excel">Exportar Excel (.xlsx)</button>
+      <div id="exportar-msg"></div>
+    </div>
+  </section>
+
+  <footer>Monitoramento de PRF — PWA · protocolo DAR/INEA</footer>
+</main>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+<script type="module" src="/app.js?v=24"></script>
+</body>
+</html>
