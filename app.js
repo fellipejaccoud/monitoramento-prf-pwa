@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=31';
+import { supabase } from './supabase-client.js?v=32';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=31';
+} from './db.js?v=32';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -420,6 +420,17 @@ const escaparTexto = (s) => String(s ?? '')
 const escaparAtributo = (s) => escaparTexto(s)
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+// Vários pontos do app recriam uma região inteira do DOM a cada interação (renderMosaico, render()
+// dos pickers de espécie) — sem restaurar o foco depois, ele volta pro <body>, e quem navega só por
+// teclado/TalkBack perde a posição a cada toque. Centraliza o requestAnimationFrame(foco) em vez de
+// repetir em cada ponto que recria DOM.
+function renderPreservandoFoco(render, seletorFoco) {
+  render();
+  if (seletorFoco) {
+    requestAnimationFrame(() => { document.querySelector(seletorFoco)?.focus(); });
+  }
+}
+
 function mostrarMsg(elId, html, ms = 4000) {
   const el = document.getElementById(elId);
   if (el._timer) clearTimeout(el._timer);
@@ -677,7 +688,9 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
       `<span class="chip">${escaparTexto(c)}<button type="button" data-i="${i}" aria-label="Remover espécie ${escaparAtributo(c)}">×</button></span>`).join('');
     chipsEl.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       chips.splice(Number(b.dataset.i), 1);
-      render();
+      // O chip removido deixa de existir, então não tem "o mesmo elemento" pra devolver o foco —
+      // o campo de busca é o destino que faz sentido pra continuar navegando/digitando.
+      renderPreservandoFoco(render, `#${inputId}`);
       // Remover uma espécie muda o cumulativo do processo tanto quanto adicionar — sem isso, o
       // número exibido em tela (Atrativos de fauna / Riqueza aparente) ficava desatualizado até
       // trocar de processo, e é esse número que orienta a classificação em campo.
@@ -1475,17 +1488,25 @@ function abrirPickerFoto(resultado, pontoId, metricas) {
     ? `<p class="hint" style="width:100%;margin:0 0 6px;font-weight:600;">Toque em cada foto abaixo para atribuí-la a este ponto (máx. 2) — toque de novo para remover.${
         bloqueadas ? ` (${bloqueadas} foto(s) já atribuída(s) a outro ponto não aparecem aqui.)` : ''
       }</p>` +
-      disponiveis.map((f) => {
+      disponiveis.map((f, i) => {
         const selecionada = mosaicoAtual[pontoId].includes(f.id);
+        // Botão real em vez de <img> com onclick — só assim recebe foco e responde a Enter/Espaço.
+        // Nome acessível ESTÁVEL ("Foto 3 de 8"), não muda quando a seleção muda — quem comunica o
+        // estado é aria-pressed. Colocar a ação no nome ("Atribuir foto 3") criaria duas fontes de
+        // verdade que se contradizem quando já está selecionada. Pelo mesmo motivo o selo visual
+        // "✓ atribuída" é aria-hidden: seria a mesma informação anunciada duas vezes. alt="" na
+        // imagem porque é decorativa — o nome vem do botão.
         return `<span class="thumb-pick-wrap">
-          <img src="${f.dataUrl}" class="thumb-pick ${selecionada ? 'selecionada' : ''}" data-foto="${f.id}" alt="">
-          ${selecionada ? '<span class="thumb-pick-check">✓ atribuída</span>' : ''}
+          <button type="button" class="thumb-pick-btn" data-foto="${f.id}" aria-pressed="${selecionada}" aria-label="Foto ${i + 1} de ${disponiveis.length}">
+            <img src="${f.dataUrl}" class="thumb-pick ${selecionada ? 'selecionada' : ''}" alt="">
+          </button>
+          ${selecionada ? '<span class="thumb-pick-check" aria-hidden="true">✓ atribuída</span>' : ''}
         </span>`;
       }).join('')
     : `<span class="hint">${bloqueadas ? 'Todas as fotos carregadas já estão atribuídas a outros pontos.' : 'Nenhuma foto carregada ainda.'}</span>`;
   picker.classList.add('show');
-  picker.querySelectorAll('.thumb-pick').forEach((img) => img.addEventListener('click', () => {
-    const fotoId = Number(img.dataset.foto);
+  picker.querySelectorAll('.thumb-pick-btn').forEach((btn) => btn.addEventListener('click', () => {
+    const fotoId = Number(btn.dataset.foto);
     mosaicoManual.add(pontoId);
     const atual = mosaicoAtual[pontoId];
     if (atual.includes(fotoId)) {
@@ -1494,7 +1515,12 @@ function abrirPickerFoto(resultado, pontoId, metricas) {
       if (atual.length >= 2) { alert('Máximo de 2 fotos por ponto.'); return; }
       mosaicoAtual[pontoId] = [...atual, fotoId];
     }
-    renderMosaico(metricas);
+    // Preserva o foco na mesma foto depois do re-render completo do mosaico — sem isso, cada toque
+    // devolvia o foco pro <body>, perdendo a posição de quem navega só por teclado/TalkBack.
+    renderPreservandoFoco(
+      () => renderMosaico(metricas),
+      `.foto-picker[data-picker="${pontoId}"] [data-foto="${fotoId}"]`
+    );
   }));
 }
 
@@ -1535,11 +1561,15 @@ function renderMosaico(metricas) {
     const thumbs = atribuidas.length
       ? atribuidas.map((f) => `<span class="thumb-wrap"><img src="${f.dataUrl}" alt="foto do ponto ${i + 1}"><button type="button" class="thumb-remove" data-ponto="${p.id}" data-foto="${f.id}" aria-label="Remover foto do ponto ${i + 1}"><span aria-hidden="true">×</span></button></span>`).join('')
       : '<span class="hint">sem foto atribuída ainda</span>';
+    // id real (não só data-picker) porque aria-controls precisa resolver pra um id de verdade —
+    // data-picker continua existindo porque p.id (UUID) pode começar com dígito, o que é válido em
+    // getElementById/aria-controls mas quebra em querySelector sem escape; o resto do código
+    // continua buscando por atributo, só o aria-controls/getElementById usa o id novo.
     return `<div class="foto-ponto">
       <div class="hint"><strong>Ponto ${i + 1}</strong> (${new Date(p.avaliado_em).toLocaleString('pt-BR')})</div>
       <div class="thumbs">${thumbs}</div>
-      <button type="button" class="btn secundario pequeno btn-escolher-fotos" data-ponto="${p.id}">Escolher fotos manualmente</button>
-      <div class="foto-picker" data-picker="${p.id}"></div>
+      <button type="button" class="btn secundario pequeno btn-escolher-fotos" data-ponto="${p.id}" aria-expanded="${pickerAbertoId === p.id}" aria-controls="foto-picker-${p.id}">Escolher fotos manualmente</button>
+      <div class="foto-picker" id="foto-picker-${p.id}" data-picker="${p.id}"></div>
     </div>`;
   }).join('');
 
@@ -1555,8 +1585,10 @@ function renderMosaico(metricas) {
     const pontoId = btn.dataset.ponto;
     const jaAberto = pickerAbertoId === pontoId;
     resultado.querySelectorAll('.foto-picker').forEach((el) => el.classList.remove('show'));
+    resultado.querySelectorAll('.btn-escolher-fotos').forEach((b) => b.setAttribute('aria-expanded', 'false'));
     pickerAbertoId = jaAberto ? null : pontoId;
     if (jaAberto) return;
+    btn.setAttribute('aria-expanded', 'true');
     abrirPickerFoto(resultado, pontoId, metricas);
   }));
 
