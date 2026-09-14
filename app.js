@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=28';
+import { supabase } from './supabase-client.js?v=29';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=28';
+} from './db.js?v=29';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -632,6 +632,10 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
     chipsEl.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       chips.splice(Number(b.dataset.i), 1);
       render();
+      // Remover uma espécie muda o cumulativo do processo tanto quanto adicionar — sem isso, o
+      // número exibido em tela (Atrativos de fauna / Riqueza aparente) ficava desatualizado até
+      // trocar de processo, e é esse número que orienta a classificação em campo.
+      if (opts.onChange) opts.onChange();
     }));
   }
 
@@ -640,6 +644,7 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
     chips.push(texto);
     render();
     if (!externa && opts.onAdd) opts.onAdd(texto);
+    if (opts.onChange) opts.onChange();
     return true;
   }
 
@@ -690,9 +695,17 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
 // conta as que têm flor/fruto — ou seja, toda espécie de atrativos também é, por definição, uma
 // espécie de riqueza. Por isso o picker de fauna precisa existir depois do de riqueza, pra poder
 // empurrar a espécie pra lá automaticamente (sem digitar duas vezes).
-const vegetalPicker = createSpeciesPicker('pt-vegetal-busca', 'pt-vegetal-lista', 'pt-vegetal-chips');
+// onChange (novo, Fase 10 do plano de acessibilidade): antes só o faunaPicker notificava o
+// cumulativo, e só no onAdd — vegetalPicker não tinha onAdd nenhum, e remover um chip em qualquer
+// um dos dois não notificava nada. Resultado real: adicionar espécie direto na Riqueza aparente, ou
+// remover qualquer chip, deixava o número cumulativo exibido em tela desatualizado até trocar de
+// processo — e é esse número que orienta a classificação (Crítica/Mínima/Adequada) em campo.
+const vegetalPicker = createSpeciesPicker('pt-vegetal-busca', 'pt-vegetal-lista', 'pt-vegetal-chips', {
+  onChange: () => atualizarPreviewCumulativo()
+});
 const faunaPicker = createSpeciesPicker('pt-fauna-busca', 'pt-fauna-lista', 'pt-fauna-chips', {
-  onAdd: (texto) => { vegetalPicker.adicionarExterna(texto); atualizarPreviewCumulativo(); }
+  onAdd: (texto) => { vegetalPicker.adicionarExterna(texto); },
+  onChange: () => atualizarPreviewCumulativo()
 });
 
 // ---------- Dados do técnico avaliador (edição posterior — o cadastro obrigatório é no perfil-gate) ----------
