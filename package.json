@@ -4,8 +4,8 @@
   "description": "Monitoramento de Projetos de Reposição Florestal (PRF) — PWA no Cloudflare Pages + Supabase",
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev .",
-    "deploy": "wrangler pages deploy ."
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

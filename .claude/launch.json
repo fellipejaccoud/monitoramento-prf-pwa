@@ -4,7 +4,7 @@
     {
       "name": "prf-pwa",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["wrangler", "pages", "dev", ".", "--port", "8790"],
+      "runtimeArgs": ["wrangler", "pages", "dev", "public", "--port", "8790"],
       "port": 8790
     }
   ]
