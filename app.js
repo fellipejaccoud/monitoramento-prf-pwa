@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=27';
+import { supabase } from './supabase-client.js?v=28';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=27';
+} from './db.js?v=28';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -190,7 +190,7 @@ document.getElementById('form-perfil-inicial').addEventListener('submit', async 
   const msgEl = document.getElementById('perfil-inicial-msg');
   const { error } = await salvarPerfilRemoto(dados);
   if (error) {
-    msgEl.innerHTML = `<div class="msg erro">Não foi possível salvar (${error.message}). Confira sua conexão e tente de novo.</div>`;
+    msgEl.innerHTML = `<div class="msg erro">Não foi possível salvar (${escaparTexto(error.message)}). Confira sua conexão e tente de novo.</div>`;
     return;
   }
   salvarTecnico({ nome: dados.nome_completo, matricula: dados.matricula || '', setor: dados.setor || '', formacao: dados.formacao || '', aprovado: false });
@@ -249,7 +249,7 @@ document.getElementById('form-nova-senha').addEventListener('submit', async (e) 
   btn.disabled = false;
   btn.textContent = 'Salvar nova senha';
   if (error) {
-    msgEl.innerHTML = `<div class="msg erro">${error.message}</div>`;
+    msgEl.innerHTML = `<div class="msg erro">${escaparTexto(error.message)}</div>`;
     return;
   }
   atualizarUiAuth(sessaoAtual);
@@ -310,7 +310,7 @@ async function fazerLogin() {
   btn.disabled = false;
   btn.textContent = 'Entrar';
   if (error) {
-    msgEl.innerHTML = `<div class="msg erro">${error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message}</div>`;
+    msgEl.innerHTML = `<div class="msg erro">${error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : escaparTexto(error.message)}</div>`;
   }
 }
 
@@ -329,14 +329,14 @@ async function fazerCadastro() {
   btn.disabled = false;
   btn.textContent = 'Criar conta';
   if (error) {
-    msgEl.innerHTML = `<div class="msg erro">${error.message}</div>`;
+    msgEl.innerHTML = `<div class="msg erro">${escaparTexto(error.message)}</div>`;
     return;
   }
   if (data.session) {
     // Confirmação de e-mail desligada no projeto — já entra direto, sem precisar checar e-mail.
     msgEl.innerHTML = '';
   } else {
-    msgEl.innerHTML = `<div class="msg ok">Conta criada! Confirme o e-mail enviado para ${email} e depois volte aqui pra entrar.</div>`;
+    msgEl.innerHTML = `<div class="msg ok">Conta criada! Confirme o e-mail enviado para ${escaparTexto(email)} e depois volte aqui pra entrar.</div>`;
   }
 }
 
@@ -355,8 +355,8 @@ document.getElementById('link-esqueci-senha').addEventListener('click', async (e
   if (!email) { msgEl.innerHTML = '<div class="msg erro">Digite seu e-mail no campo acima primeiro.</div>'; return; }
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
   msgEl.innerHTML = error
-    ? `<div class="msg erro">${error.message}</div>`
-    : `<div class="msg ok">Enviamos um link de redefinição de senha para ${email}.</div>`;
+    ? `<div class="msg erro">${escaparTexto(error.message)}</div>`
+    : `<div class="msg ok">Enviamos um link de redefinição de senha para ${escaparTexto(email)}.</div>`;
 });
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
@@ -370,6 +370,18 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 });
 
 // ---------- Mensagens de feedback (somem sozinhas, não ficam presas na tela) ----------
+// ---------- Escape de texto/atributo (Fase 9 do plano de acessibilidade — achado de segurança) ----------
+// Vários pontos do app interpolam dado digitado pelo usuário (espécie em texto livre, número do
+// processo, observações, nome de arquivo de foto) direto em innerHTML sem escapar. Como processos e
+// espécies sincronizam com o Supabase e voltam pra outros aparelhos, isso é XSS ARMAZENADO de
+// verdade, não só local. escaparTexto cobre contexto de texto solto; escaparAtributo cobre o que
+// entra dentro de aspas de atributo (alt, title, aria-label, data-*) — precisa também escapar aspas,
+// que escaparTexto sozinho não cobre.
+const escaparTexto = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escaparAtributo = (s) => escaparTexto(s)
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 function mostrarMsg(elId, html, ms = 4000) {
   const el = document.getElementById(elId);
   if (el._timer) clearTimeout(el._timer);
@@ -616,7 +628,7 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
 
   function render() {
     chipsEl.innerHTML = chips.map((c, i) =>
-      `<span class="chip">${c}<button type="button" data-i="${i}" aria-label="Remover espécie ${c}">×</button></span>`).join('');
+      `<span class="chip">${escaparTexto(c)}<button type="button" data-i="${i}" aria-label="Remover espécie ${escaparAtributo(c)}">×</button></span>`).join('');
     chipsEl.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       chips.splice(Number(b.dataset.i), 1);
       render();
@@ -810,7 +822,7 @@ async function carregarProcessosEdicao() {
   const el = document.getElementById('p-editar-select');
   const valorAtual = el.value;
   el.innerHTML = '<option value="">— Novo processo —</option>' +
-    unicos.map((p) => `<option value="${p.id}">${p.numero_administrativo}</option>`).join('');
+    unicos.map((p) => `<option value="${escaparAtributo(p.id)}">${escaparTexto(p.numero_administrativo)}</option>`).join('');
   el.value = unicos.some((p) => p.id === valorAtual) ? valorAtual : '';
   return unicos;
 }
@@ -921,7 +933,7 @@ async function carregarProcessosNoSelect(seletor) {
   // outra aba (Ponto de Obs./Mapa/Relatório) — é o que faz o processo "grudar" ao trocar de aba.
   const valorAtual = valorAnterior || processoAtualId;
   el.innerHTML = '<option value="" disabled>Selecione o processo</option>' +
-    unicos.map((p) => `<option value="${p.id}">${p.numero_administrativo}</option>`).join('');
+    unicos.map((p) => `<option value="${escaparAtributo(p.id)}">${escaparTexto(p.numero_administrativo)}</option>`).join('');
   if (valorAtual && unicos.some((p) => p.id === valorAtual)) {
     el.value = valorAtual;
     // Só dispara "change" quando o valor está sendo definido AGORA (veio da memória compartilhada
@@ -1192,7 +1204,7 @@ document.getElementById('m-processo').addEventListener('change', (e) => {
 
 function renderChipsEspecies(set) {
   if (!set.size) return '<span class="hint">Nenhuma registrada.</span>';
-  return `<div class="chips">${[...set].sort().map((s) => `<span class="chip">${s}</span>`).join('')}</div>`;
+  return `<div class="chips">${[...set].sort().map((s) => `<span class="chip">${escaparTexto(s)}</span>`).join('')}</div>`;
 }
 
 async function atualizarMetricas() {
@@ -1266,7 +1278,7 @@ async function carregarRevisaoPontos(processoId) {
     const hora = new Date(p.avaliado_em).toLocaleString('pt-BR');
     const coords = (p.latitude != null && p.longitude != null) ? `${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}` : 'sem coordenada registrada';
     return `<div class="revisao-item">
-      <div class="resumo"><b>Ponto avaliado em ${hora}</b><br>Soma direta dos 5 parâmetros: ${soma.toFixed(2)} · ${coords}${p.observacoes ? `<br>${p.observacoes}` : ''}</div>
+      <div class="resumo"><b>Ponto avaliado em ${hora}</b><br>Soma direta dos 5 parâmetros: ${soma.toFixed(2)} · ${coords}${p.observacoes ? `<br>${escaparTexto(p.observacoes)}` : ''}</div>
       <div class="acoes">
         <button type="button" class="btn secundario btn-editar-ponto-revisao" data-id="${p.id}">Editar</button>
         <button type="button" class="btn btn-enviar-ponto-revisao" data-id="${p.id}">Confirmar e enviar</button>
@@ -1448,7 +1460,7 @@ function renderMosaico(metricas) {
   // horário parecia visualmente idêntico a "nada carregou" — essa galeria prova imediatamente que
   // o upload funcionou, independente do casamento automático ter dado certo ou não.
   const galeria = fotosCarregadas.length
-    ? `<div class="thumbs" style="margin:8px 0 14px;">${fotosCarregadas.map((f) => `<img src="${f.dataUrl}" class="thumb-pick selecionada" style="cursor:default;" alt="${f.nome}" title="${f.nome}">`).join('')}</div>`
+    ? `<div class="thumbs" style="margin:8px 0 14px;">${fotosCarregadas.map((f) => `<img src="${f.dataUrl}" class="thumb-pick selecionada" style="cursor:default;" alt="${escaparAtributo(f.nome)}" title="${escaparAtributo(f.nome)}">`).join('')}</div>`
     : '';
 
   // Mensagem de progresso separada da galeria — role="status" numa região que é inteiramente
@@ -1714,7 +1726,7 @@ document.getElementById('btn-exportar-excel').addEventListener('click', async ()
   mostrarMsg('exportar-msg', '<div class="msg ok">Excel gerado.</div>');
   } catch (erro) {
     if (abaExcel) abaExcel.close();
-    mostrarMsg('exportar-msg', `<div class="msg erro">Não foi possível gerar o Excel: ${erro?.message || erro}</div>`, 10000);
+    mostrarMsg('exportar-msg', `<div class="msg erro">Não foi possível gerar o Excel: ${escaparTexto(erro?.message || erro)}</div>`, 10000);
     console.error('Erro ao gerar Excel:', erro);
   }
 });
@@ -2321,7 +2333,7 @@ document.getElementById('btn-exportar-pdf').addEventListener('click', async () =
     mostrarMsg('exportar-msg', '<div class="msg ok">PDF gerado.</div>');
   } catch (erro) {
     if (abaPdf) abaPdf.close();
-    mostrarMsg('exportar-msg', `<div class="msg erro">Não foi possível gerar o PDF: ${erro?.message || erro}</div>`, 10000);
+    mostrarMsg('exportar-msg', `<div class="msg erro">Não foi possível gerar o PDF: ${escaparTexto(erro?.message || erro)}</div>`, 10000);
     console.error('Erro ao gerar PDF:', erro);
   }
 });
@@ -2475,7 +2487,7 @@ document.getElementById('mapa-kml').addEventListener('change', async (e) => {
     e.target.value = '';
     await carregarPontosNoMapa(processoId);
   } catch (erro) {
-    msgEl.innerHTML = `<div class="msg erro">Não foi possível ler esse KML: ${erro?.message || erro}</div>`;
+    msgEl.innerHTML = `<div class="msg erro">Não foi possível ler esse KML: ${escaparTexto(erro?.message || erro)}</div>`;
     console.error('Erro ao importar KML:', erro);
   }
 });
@@ -2553,7 +2565,7 @@ async function carregarPontosNoMapa(processoId) {
   poligonosDoProcesso.forEach((pol) => {
     const layer = window.L.polygon(pol.anel, {
       color: '#6b4fa0', weight: 2, fillColor: '#6b4fa0', fillOpacity: 0.12
-    }).addTo(mapaLeaflet).bindPopup(`${pol.nome} (área de plantio)`);
+    }).addTo(mapaLeaflet).bindPopup(`${escaparTexto(pol.nome)} (área de plantio)`);
     mapaPoligonos.push(layer);
     grupo.push(...pol.anel);
   });
@@ -2562,7 +2574,7 @@ async function carregarPontosNoMapa(processoId) {
   const kmlTodos = await listarTodos('kml_pontos');
   const kmlPontos = kmlTodos.filter((p) => p.processo_id === processoId);
   kmlPontos.forEach((p) => {
-    const marker = window.L.marker([p.lat, p.lon]).addTo(mapaLeaflet).bindPopup(`${p.nome} (planejado)`);
+    const marker = window.L.marker([p.lat, p.lon]).addTo(mapaLeaflet).bindPopup(`${escaparTexto(p.nome)} (planejado)`);
     mapaMarcadores[p.id] = marker;
     grupo.push([p.lat, p.lon]);
     const opt = document.createElement('option');
