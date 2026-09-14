@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=26';
+import { supabase } from './supabase-client.js?v=27';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=26';
+} from './db.js?v=27';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -27,9 +27,11 @@ if ('serviceWorker' in navigator) {
 // que alguém abrisse aquela aba com um HTML incompatível.
 const IDS_OBRIGATORIOS = [
   // Login / cadastro / gates
-  'login-email', 'login-senha', 'btn-login', 'btn-cadastrar', 'link-alternar-modo',
-  'link-esqueci-senha', 'btn-logout', 'form-perfil-inicial', 'btn-verificar-aprovacao',
-  'form-nova-senha', 'pendentes-badge', 'pendentes-badge-texto', 'btn-sincronizar-agora',
+  'form-login', 'login-titulo', 'login-desc', 'login-email', 'login-senha',
+  'login-confirma-wrap', 'login-senha-confirma', 'btn-login', 'btn-cadastrar', 'login-msg',
+  'link-alternar-modo', 'link-esqueci-senha', 'btn-logout', 'form-perfil-inicial',
+  'btn-verificar-aprovacao', 'form-nova-senha', 'pendentes-badge', 'pendentes-badge-texto',
+  'btn-sincronizar-agora',
   // Perfil do técnico
   'form-tecnico', 't-nome', 't-matricula', 't-setor', 't-formacao',
   // Processo
@@ -44,7 +46,7 @@ const IDS_OBRIGATORIOS = [
   'mapa-processo', 'mapa-kml', 'mapa-leaflet', 'btn-goto-point', 'btn-parar-navegacao',
   // Relatório
   'm-processo', 'm-revisao-card', 'm-revisao-lista', 'm-revisao-msg', 'btn-confirmar-todos-pontos',
-  'm-fotos', 'btn-limpar-fotos', 'btn-exportar-pdf', 'btn-exportar-excel'
+  'm-fotos', 'm-fotos-msg', 'btn-limpar-fotos', 'btn-exportar-pdf', 'btn-exportar-excel'
 ];
 const idsFaltando = IDS_OBRIGATORIOS.filter((id) => !document.getElementById(id));
 if (idsFaltando.length) {
@@ -264,19 +266,39 @@ function atualizarModoLogin() {
   document.getElementById('login-desc').textContent = modoCadastro
     ? 'Cadastre um e-mail e uma senha — qualquer e-mail serve, não precisa ser institucional.'
     : 'Digite seu e-mail e senha.';
-  document.getElementById('login-confirma-wrap').style.display = modoCadastro ? 'block' : 'none';
-  document.getElementById('btn-login').style.display = modoCadastro ? 'none' : 'block';
-  document.getElementById('btn-cadastrar').style.display = modoCadastro ? 'block' : 'none';
+
+  const confirma = document.getElementById('login-senha-confirma');
+  // hidden (não style.display) pra ficar legível por tecnologia assistiva; disabled tira do Tab e
+  // do envio do form — só hidden não bastaria (o campo continuaria tabulável e indo no submit).
+  document.getElementById('login-confirma-wrap').hidden = !modoCadastro;
+  confirma.disabled = !modoCadastro;
+  confirma.required = modoCadastro;
+  if (!modoCadastro) confirma.value = '';
+
+  // Os dois botões são type="submit" dentro do mesmo <form> — só um pode estar habilitado por vez,
+  // senão Enter no formulário poderia resolver pro botão errado (o primeiro em ordem no DOM,
+  // mesmo escondido) dependendo do navegador.
+  const btnLogin = document.getElementById('btn-login');
+  const btnCadastrar = document.getElementById('btn-cadastrar');
+  btnLogin.style.display = modoCadastro ? 'none' : 'block';
+  btnLogin.disabled = modoCadastro;
+  btnCadastrar.style.display = modoCadastro ? 'block' : 'none';
+  btnCadastrar.disabled = !modoCadastro;
+
   document.getElementById('link-alternar-modo').textContent = modoCadastro ? 'Já tem conta? Entrar' : 'Ainda não tem conta? Cadastre-se';
   document.getElementById('login-msg').innerHTML = '';
 }
+// Estabelece o estado inicial sem depender do que já está escrito no HTML (que só cobre a
+// aparência visual, não os atributos disabled/required que este JS agora controla).
+atualizarModoLogin();
+
 document.getElementById('link-alternar-modo').addEventListener('click', (e) => {
   e.preventDefault();
   modoCadastro = !modoCadastro;
   atualizarModoLogin();
 });
 
-document.getElementById('btn-login').addEventListener('click', async () => {
+async function fazerLogin() {
   const email = document.getElementById('login-email').value.trim();
   const senha = document.getElementById('login-senha').value;
   const msgEl = document.getElementById('login-msg');
@@ -290,9 +312,9 @@ document.getElementById('btn-login').addEventListener('click', async () => {
   if (error) {
     msgEl.innerHTML = `<div class="msg erro">${error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message}</div>`;
   }
-});
+}
 
-document.getElementById('btn-cadastrar').addEventListener('click', async () => {
+async function fazerCadastro() {
   const email = document.getElementById('login-email').value.trim();
   const senha = document.getElementById('login-senha').value;
   const confirma = document.getElementById('login-senha-confirma').value;
@@ -316,6 +338,14 @@ document.getElementById('btn-cadastrar').addEventListener('click', async () => {
   } else {
     msgEl.innerHTML = `<div class="msg ok">Conta criada! Confirme o e-mail enviado para ${email} e depois volte aqui pra entrar.</div>`;
   }
+}
+
+// <form> de verdade em vez de inputs soltos + botões type="button": antes disso, apertar Enter no
+// campo de senha não fazia nada — era o único fluxo do app sem submit nativo, e é a primeira tela
+// que qualquer pessoa encontra.
+document.getElementById('form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (modoCadastro) await fazerCadastro(); else await fazerLogin();
 });
 
 document.getElementById('link-esqueci-senha').addEventListener('click', async (e) => {
@@ -586,7 +616,7 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
 
   function render() {
     chipsEl.innerHTML = chips.map((c, i) =>
-      `<span class="chip">${c}<button type="button" data-i="${i}">×</button></span>`).join('');
+      `<span class="chip">${c}<button type="button" data-i="${i}" aria-label="Remover espécie ${c}">×</button></span>`).join('');
     chipsEl.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       chips.splice(Number(b.dataset.i), 1);
       render();
@@ -1421,12 +1451,18 @@ function renderMosaico(metricas) {
     ? `<div class="thumbs" style="margin:8px 0 14px;">${fotosCarregadas.map((f) => `<img src="${f.dataUrl}" class="thumb-pick selecionada" style="cursor:default;" alt="${f.nome}" title="${f.nome}">`).join('')}</div>`
     : '';
 
-  resultado.innerHTML = `<p class="hint">${fotosCarregadas.length} foto(s) carregada(s) ao todo.${
+  // Mensagem de progresso separada da galeria — role="status" numa região que é inteiramente
+  // recriada a cada re-render (como m-fotos-resultado) não é confiável pra leitor de tela. O
+  // resumo (marco: quantas fotos, quantas sem data) vai num elemento próprio e estável; miniaturas
+  // e botões continuam fora da live region, senão o leitor tentaria anunciar cada thumbnail.
+  document.getElementById('m-fotos-msg').textContent = `${fotosCarregadas.length} foto(s) carregada(s) ao todo.${
     semData ? ` ${semData} sem data/hora no arquivo (comum em fotos reenviadas por WhatsApp — o reenvio apaga essa informação). Use "Escolher fotos manualmente" nesses pontos.` : ''
-  }</p>${galeria}` + metricas.pontos.map((p, i) => {
+  }`;
+
+  resultado.innerHTML = `${galeria}` + metricas.pontos.map((p, i) => {
     const atribuidas = (mosaicoAtual[p.id] || []).map(fotoPorId).filter(Boolean);
     const thumbs = atribuidas.length
-      ? atribuidas.map((f) => `<span class="thumb-wrap"><img src="${f.dataUrl}" alt="foto do ponto ${i + 1}"><button type="button" class="thumb-remove" data-ponto="${p.id}" data-foto="${f.id}">×</button></span>`).join('')
+      ? atribuidas.map((f) => `<span class="thumb-wrap"><img src="${f.dataUrl}" alt="foto do ponto ${i + 1}"><button type="button" class="thumb-remove" data-ponto="${p.id}" data-foto="${f.id}" aria-label="Remover foto do ponto ${i + 1}"><span aria-hidden="true">×</span></button></span>`).join('')
       : '<span class="hint">sem foto atribuída ainda</span>';
     return `<div class="foto-ponto">
       <div class="hint"><strong>Ponto ${i + 1}</strong> (${new Date(p.avaliado_em).toLocaleString('pt-BR')})</div>
@@ -1562,6 +1598,7 @@ document.getElementById('btn-limpar-fotos').addEventListener('click', () => {
   mosaicoManual = new Set();
   pickerAbertoId = null;
   document.getElementById('m-fotos-resultado').innerHTML = '';
+  document.getElementById('m-fotos-msg').textContent = '';
 });
 
 // ---------- Exportar ----------
