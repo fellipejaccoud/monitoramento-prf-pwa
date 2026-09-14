@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=25';
+import { supabase } from './supabase-client.js?v=26';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=25';
+} from './db.js?v=26';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -29,7 +29,7 @@ const IDS_OBRIGATORIOS = [
   // Login / cadastro / gates
   'login-email', 'login-senha', 'btn-login', 'btn-cadastrar', 'link-alternar-modo',
   'link-esqueci-senha', 'btn-logout', 'form-perfil-inicial', 'btn-verificar-aprovacao',
-  'form-nova-senha',
+  'form-nova-senha', 'pendentes-badge', 'pendentes-badge-texto', 'btn-sincronizar-agora',
   // Perfil do técnico
   'form-tecnico', 't-nome', 't-matricula', 't-setor', 't-formacao',
   // Processo
@@ -742,13 +742,25 @@ async function enviarPontoRevisado(id) {
 async function atualizarBadgePendentes() {
   const n = await contarPendentes();
   const badge = document.getElementById('pendentes-badge');
+  const texto = document.getElementById('pendentes-badge-texto');
   if (n > 0) {
-    badge.style.display = 'block';
-    badge.textContent = `${n} registro(s) pendente(s) de sincronização`;
+    badge.style.display = 'flex';
+    // "Processo/KML" pra deixar claro que isso NÃO inclui pontos de observação — esses ficam
+    // retidos de propósito pra revisão manual (ver card "Revisão antes de enviar" no Relatório) e
+    // têm contagem própria, não entram neste número (ver comentário em contarPendentes, db.js).
+    texto.textContent = `${n} registro(s) de processo/KML pendente(s) de sincronização`;
   } else {
     badge.style.display = 'none';
   }
 }
+document.getElementById('btn-sincronizar-agora').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-sincronizar-agora');
+  btn.disabled = true;
+  btn.textContent = 'Sincronizando...';
+  await sincronizarPendentes();
+  btn.disabled = false;
+  btn.textContent = 'Sincronizar agora';
+});
 window.addEventListener('online', sincronizarPendentes);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) sincronizarPendentes(); });
 
