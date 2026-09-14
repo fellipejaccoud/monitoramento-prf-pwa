@@ -87,13 +87,15 @@
   /* segmented control Crítica/Mínima/Adequada */
   .dar-param{margin:14px 0;}
   .dar-param .nome{font-size:.82rem;font-weight:700;color:var(--texto);margin-bottom:6px;}
+  /* Radios nativos (Fase 6) escondidos com .sr-only — NÃO display:none, que tiraria do fluxo de
+     foco/Tab. O visual "botão" inteiro é o <label> adjacente, estilizado via input:checked + label. */
   .segmented{display:grid;grid-template-columns:repeat(auto-fit,minmax(6.5rem,1fr));gap:6px;}
-  .segmented button{border:1.5px solid var(--borda);background:#fff;padding:9px 4px;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--texto-suave);line-height:1.3;min-height:var(--toque);}
-  .segmented button[data-nivel="critica"].on{background:var(--critico);border-color:var(--critico);color:#fff;}
-  .segmented button[data-nivel="minima"].on{background:var(--minimo-texto);border-color:var(--minimo-texto);color:#fff;}
-  .segmented button[data-nivel="adequada"].on{background:var(--adequado);border-color:var(--adequado);color:#fff;}
+  .segmented label{border:1.5px solid var(--borda);background:#fff;padding:9px 4px;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--texto-suave);line-height:1.3;min-height:var(--toque);display:flex;align-items:center;justify-content:center;text-align:center;}
+  .segmented input[data-nivel="critica"]:checked + label{background:var(--critico);border-color:var(--critico);color:#fff;}
+  .segmented input[data-nivel="minima"]:checked + label{background:var(--minimo-texto);border-color:var(--minimo-texto);color:#fff;}
+  .segmented input[data-nivel="adequada"]:checked + label{background:var(--adequado);border-color:var(--adequado);color:#fff;}
   /* Estado não pode depender só de cor */
-  .segmented button.on::after{content:" ✓";font-weight:900;}
+  .segmented input:checked + label::after{content:" ✓";font-weight:900;}
 
   .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:10px;margin-top:10px;}
   .kpi{background:#fafbfa;border:1px solid var(--borda);border-radius:9px;padding:12px 8px;text-align:center;}
@@ -217,9 +219,12 @@
   .skip-link:focus{left:0;}
   #conteudo-principal:focus{outline:none;}
   .fonte-opcoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
-  .fonte-btn{margin-top:0;flex:1;min-width:7rem;}
-  .fonte-btn.on{background:var(--verde);color:#fff;border-color:var(--verde);}
-  .fonte-btn.on::after{content:" ✓";font-weight:900;}
+  .fonte-btn{margin-top:0;flex:1;min-width:7rem;text-align:center;}
+  /* Mesmo raciocínio do segmented (Fase 6): três opções sempre com exatamente uma ativa — radio
+     nativo, não aria-pressed (que descreveria toggles independentes, não um conjunto exclusivo). */
+  .fonte-opcoes input:checked + .fonte-btn{background:var(--verde);color:#fff;border-color:var(--verde);}
+  .fonte-opcoes input:checked + .fonte-btn::after{content:" ✓";font-weight:900;}
+  .fonte-opcoes input:focus-visible + .fonte-btn{outline:3px solid var(--verde-escuro);outline-offset:2px;}
 </style>
 </head>
 <body>
@@ -319,10 +324,13 @@
       <p class="eyebrow">Acessibilidade</p>
       <h2>Tamanho do texto</h2>
       <p class="desc">Ajusta o tamanho de todo o texto do app, sem quebrar o layout — útil pra tela do celular em campo, sob sol ou com vista cansada.</p>
-      <div class="fonte-opcoes" role="group" aria-label="Tamanho do texto">
-        <button type="button" class="btn secundario pequeno fonte-btn" data-fonte="padrao">A Padrão</button>
-        <button type="button" class="btn secundario pequeno fonte-btn" data-fonte="grande">A Grande</button>
-        <button type="button" class="btn secundario pequeno fonte-btn" data-fonte="enorme">A Muito grande</button>
+      <div class="fonte-opcoes" role="radiogroup" aria-label="Tamanho do texto">
+        <input type="radio" id="fonte-padrao" name="fonte" data-fonte="padrao" class="sr-only" checked>
+        <label for="fonte-padrao" class="btn secundario pequeno fonte-btn">A Padrão</label>
+        <input type="radio" id="fonte-grande" name="fonte" data-fonte="grande" class="sr-only">
+        <label for="fonte-grande" class="btn secundario pequeno fonte-btn">A Grande</label>
+        <input type="radio" id="fonte-enorme" name="fonte" data-fonte="enorme" class="sr-only">
+        <label for="fonte-enorme" class="btn secundario pequeno fonte-btn">A Muito grande</label>
       </div>
     </div>
 
@@ -497,15 +505,18 @@
           <div class="pontos-lancados-lista" id="pt-lancados-lista"></div>
         </div>
 
-        <div class="dar-param" data-param="necessidade_replantio">
-          <div class="nome">Necessidade de replantio</div>
+        <fieldset class="dar-param" data-param="necessidade_replantio">
+          <legend class="nome">Necessidade de replantio</legend>
           <div class="segmented">
-            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
-            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
-            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+            <input type="radio" id="necessidade_replantio-critica" name="necessidade_replantio" data-nivel="critica" data-valor="0" class="sr-only" required>
+            <label for="necessidade_replantio-critica">Crítica (0)</label>
+            <input type="radio" id="necessidade_replantio-minima" name="necessidade_replantio" data-nivel="minima" data-valor="0.65" class="sr-only">
+            <label for="necessidade_replantio-minima">Mínima (0,65)</label>
+            <input type="radio" id="necessidade_replantio-adequada" name="necessidade_replantio" data-nivel="adequada" data-valor="1.0" class="sr-only">
+            <label for="necessidade_replantio-adequada">Adequada (1,0)</label>
           </div>
           <div class="explicacao-situacao"></div>
-        </div>
+        </fieldset>
 
         <div class="dar-param">
           <div class="nome">Atrativos de fauna — cumulativo do processo</div>
@@ -520,25 +531,31 @@
           <p class="hint">Cada espécie adicionada aqui também entra automaticamente na Riqueza aparente abaixo — é a mesma espécie contada nos dois critérios cumulativos. Espécies já contadas em pontos anteriores deste processo não aparecem mais na busca.</p>
         </div>
 
-        <div class="dar-param" data-param="cobertura_copa">
-          <div class="nome">Cobertura de copa</div>
+        <fieldset class="dar-param" data-param="cobertura_copa">
+          <legend class="nome">Cobertura de copa</legend>
           <div class="segmented">
-            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
-            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
-            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+            <input type="radio" id="cobertura_copa-critica" name="cobertura_copa" data-nivel="critica" data-valor="0" class="sr-only" required>
+            <label for="cobertura_copa-critica">Crítica (0)</label>
+            <input type="radio" id="cobertura_copa-minima" name="cobertura_copa" data-nivel="minima" data-valor="0.65" class="sr-only">
+            <label for="cobertura_copa-minima">Mínima (0,65)</label>
+            <input type="radio" id="cobertura_copa-adequada" name="cobertura_copa" data-nivel="adequada" data-valor="1.0" class="sr-only">
+            <label for="cobertura_copa-adequada">Adequada (1,0)</label>
           </div>
           <div class="explicacao-situacao"></div>
-        </div>
+        </fieldset>
 
-        <div class="dar-param" data-param="distribuicao_especies">
-          <div class="nome">Distribuição das espécies</div>
+        <fieldset class="dar-param" data-param="distribuicao_especies">
+          <legend class="nome">Distribuição das espécies</legend>
           <div class="segmented">
-            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
-            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
-            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+            <input type="radio" id="distribuicao_especies-critica" name="distribuicao_especies" data-nivel="critica" data-valor="0" class="sr-only" required>
+            <label for="distribuicao_especies-critica">Crítica (0)</label>
+            <input type="radio" id="distribuicao_especies-minima" name="distribuicao_especies" data-nivel="minima" data-valor="0.65" class="sr-only">
+            <label for="distribuicao_especies-minima">Mínima (0,65)</label>
+            <input type="radio" id="distribuicao_especies-adequada" name="distribuicao_especies" data-nivel="adequada" data-valor="1.0" class="sr-only">
+            <label for="distribuicao_especies-adequada">Adequada (1,0)</label>
           </div>
           <div class="explicacao-situacao"></div>
-        </div>
+        </fieldset>
 
         <div class="dar-param">
           <div class="nome">Riqueza aparente — cumulativo do processo</div>
@@ -552,25 +569,31 @@
           <p class="hint" id="pt-vegetal-ja-observadas"></p>
         </div>
 
-        <div class="dar-param" data-param="altura_estimada">
-          <div class="nome">Altura estimada</div>
+        <fieldset class="dar-param" data-param="altura_estimada">
+          <legend class="nome">Altura estimada</legend>
           <div class="segmented">
-            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
-            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
-            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+            <input type="radio" id="altura_estimada-critica" name="altura_estimada" data-nivel="critica" data-valor="0" class="sr-only" required>
+            <label for="altura_estimada-critica">Crítica (0)</label>
+            <input type="radio" id="altura_estimada-minima" name="altura_estimada" data-nivel="minima" data-valor="0.65" class="sr-only">
+            <label for="altura_estimada-minima">Mínima (0,65)</label>
+            <input type="radio" id="altura_estimada-adequada" name="altura_estimada" data-nivel="adequada" data-valor="1.0" class="sr-only">
+            <label for="altura_estimada-adequada">Adequada (1,0)</label>
           </div>
           <div class="explicacao-situacao"></div>
-        </div>
+        </fieldset>
 
-        <div class="dar-param" data-param="competicao">
-          <div class="nome">Competição</div>
+        <fieldset class="dar-param" data-param="competicao">
+          <legend class="nome">Competição</legend>
           <div class="segmented">
-            <button type="button" data-nivel="critica" data-valor="0">Crítica (0)</button>
-            <button type="button" data-nivel="minima" data-valor="0.65">Mínima (0,65)</button>
-            <button type="button" data-nivel="adequada" data-valor="1.0">Adequada (1,0)</button>
+            <input type="radio" id="competicao-critica" name="competicao" data-nivel="critica" data-valor="0" class="sr-only" required>
+            <label for="competicao-critica">Crítica (0)</label>
+            <input type="radio" id="competicao-minima" name="competicao" data-nivel="minima" data-valor="0.65" class="sr-only">
+            <label for="competicao-minima">Mínima (0,65)</label>
+            <input type="radio" id="competicao-adequada" name="competicao" data-nivel="adequada" data-valor="1.0" class="sr-only">
+            <label for="competicao-adequada">Adequada (1,0)</label>
           </div>
           <div class="explicacao-situacao"></div>
-        </div>
+        </fieldset>
 
         <label for="pt-observacoes">Observações</label>
         <textarea id="pt-observacoes" placeholder="Anotações livres sobre o ponto..."></textarea>
@@ -685,6 +708,6 @@
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-<script type="module" src="/app.js?v=33"></script>
+<script type="module" src="/app.js?v=34"></script>
 </body>
 </html>

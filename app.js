@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=33';
+import { supabase } from './supabase-client.js?v=34';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=33';
+} from './db.js?v=34';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -87,12 +87,14 @@ const FONTE_KEY = 'monitoramento-prf:tamanho-fonte';
 function aplicarTamanhoFonte(nivel) {
   if (nivel === 'padrao') delete document.documentElement.dataset.fonte;
   else document.documentElement.dataset.fonte = nivel;
-  document.querySelectorAll('.fonte-btn').forEach((b) => b.classList.toggle('on', b.dataset.fonte === nivel));
+  // Radio nativo (Fase 6) em vez de classList.toggle('on') — marca o input, o CSS
+  // (input:checked + .fonte-btn) cuida do visual sozinho.
+  document.querySelectorAll('.fonte-opcoes input[type="radio"]').forEach((r) => { r.checked = r.dataset.fonte === nivel; });
   localStorage.setItem(FONTE_KEY, nivel);
 }
 aplicarTamanhoFonte(localStorage.getItem(FONTE_KEY) || 'padrao');
-document.querySelectorAll('.fonte-btn').forEach((btn) => {
-  btn.addEventListener('click', () => aplicarTamanhoFonte(btn.dataset.fonte));
+document.querySelectorAll('.fonte-opcoes input[type="radio"]').forEach((input) => {
+  input.addEventListener('change', () => aplicarTamanhoFonte(input.dataset.fonte));
 });
 
 // ---------- Login por e-mail (magic link) ----------
@@ -601,8 +603,8 @@ async function calcularMetricasProcesso(processoId) {
   };
 }
 
-// ---------- Controle Crítica/Mínima/Adequada (segmented buttons) ----------
-// Textos oficiais do Anexo II (Ficha DAR) — mostrados ao clicar em cada botão, pra levar o
+// ---------- Controle Crítica/Mínima/Adequada (radios nativos com visual "segmented") ----------
+// Textos oficiais do Anexo II (Ficha DAR) — mostrados ao selecionar cada opção, pra levar o
 // avaliador a confirmar se a situação marcada realmente bate com o que ele está vendo no ponto.
 const DESCRICOES_SITUACAO = {
   necessidade_replantio: {
@@ -632,38 +634,41 @@ const DESCRICOES_SITUACAO = {
   }
 };
 
+// Radios nativos (Fase 6 do plano de acessibilidade) em vez de <button> com estado só em classList —
+// os botões já respondiam a Enter/Espaço (não havia bloqueio de teclado), mas o estado selecionado
+// não existia pra tecnologia assistiva. Radio nativo dá de graça agrupamento, estado, navegação por
+// setas e semântica corretos — é escolha exclusiva de três, o caso de uso exato pra radio.
 document.querySelectorAll('.segmented').forEach((group) => {
-  group.querySelectorAll('button').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      group.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
-      btn.classList.add('on');
-
+  group.querySelectorAll('input[type="radio"]').forEach((input) => {
+    input.addEventListener('change', () => {
       const paramEl = group.closest('.dar-param[data-param]');
       const explicacaoEl = paramEl?.querySelector('.explicacao-situacao');
       const descricoes = paramEl && DESCRICOES_SITUACAO[paramEl.dataset.param];
       if (explicacaoEl && descricoes) {
-        explicacaoEl.innerHTML = `<b>${btn.textContent} — faz sentido pro que você está vendo neste ponto?</b><br>${descricoes[btn.dataset.valor]}`;
+        const label = group.querySelector(`label[for="${input.id}"]`);
+        explicacaoEl.innerHTML = `<b>${label?.textContent ?? ''} — faz sentido pro que você está vendo neste ponto?</b><br>${descricoes[input.dataset.valor]}`;
         explicacaoEl.classList.add('show');
       }
     });
   });
 });
 function getSegmentedValue(paramName) {
-  const el = document.querySelector(`.dar-param[data-param="${paramName}"] .segmented button.on`);
+  const el = document.querySelector(`.dar-param[data-param="${paramName}"] input[type="radio"]:checked`);
   return el ? parseFloat(el.dataset.valor) : null;
 }
 function resetSegmented() {
-  document.querySelectorAll('.segmented button.on').forEach((b) => b.classList.remove('on'));
+  document.querySelectorAll('.dar-param input[type="radio"]:checked').forEach((el) => { el.checked = false; });
 }
 // Contraparte de getSegmentedValue, pra preencher o formulário na correção de um ponto já salvo —
-// dispara o click de verdade (em vez de só adicionar a classe "on") pra também mostrar o texto de
-// explicação da situação, igual aconteceria se o avaliador tivesse clicado na hora.
+// marca o radio e dispara "change" manualmente (setar .checked por script não dispara o evento
+// sozinho) pra também mostrar o texto de explicação da situação, igual aconteceria se o avaliador
+// tivesse clicado na hora.
 function setSegmentedValue(paramName, valor) {
   // data-valor no HTML é sempre "0", "0.65" ou "1.0" (texto) — valor aqui vem do banco como número
   // (parseFloat("1.0") === 1), então "1" não bate com o atributo "1.0" por comparação direta de string.
   const texto = valor === 1 ? '1.0' : String(valor);
-  const btn = document.querySelector(`.dar-param[data-param="${paramName}"] .segmented button[data-valor="${texto}"]`);
-  if (btn) btn.click();
+  const el = document.querySelector(`.dar-param[data-param="${paramName}"] input[data-valor="${texto}"]`);
+  if (el) { el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); }
 }
 
 // ---------- Busca de espécies (lista IBAMA — nome vulgar / nome científico) ----------
