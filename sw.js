@@ -1,6 +1,6 @@
-const CACHE_NAME = 'monitoramento-prf-v25';
+const CACHE_NAME = 'monitoramento-prf-v26';
 const TILE_CACHE = 'monitoramento-prf-tiles-v1';
-const SHELL_FILES = ['/', '/manifest.json', '/icon.svg', '/app.js?v=29', '/db.js?v=29', '/supabase-client.js?v=29', '/especies.json'];
+const SHELL_FILES = ['/', '/manifest.json', '/icon.svg', '/app.js?v=30', '/db.js?v=30', '/supabase-client.js?v=30', '/especies.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=29';
+import { supabase } from './supabase-client.js?v=30';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=29';
+} from './db.js?v=30';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -64,6 +64,19 @@ function onOpcional(id, evento, handler) {
   const el = document.getElementById(id);
   if (!el) { console.warn(`[boot] elemento opcional ausente: #${id}`); return; }
   el.addEventListener(evento, handler);
+}
+
+// ---------- Header sticky dinâmico ----------
+// header h1 cresce com a escala de fonte (rem), mas "nav.tabs { top: 52px }" era um valor fixo —
+// em "A Muito grande" (136%) o header passava de 52px e as abas ficavam sobrepondo o título.
+// ResizeObserver acompanha qualquer mudança de altura (fonte, largura, quebra de linha, zoom),
+// recalculando sozinho — mais robusto que ouvir "resize" e recalcular só no carregamento.
+{
+  const header = document.querySelector('header');
+  const ro = new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+  });
+  ro.observe(header);
 }
 
 // ---------- Acessibilidade — tamanho do texto ----------

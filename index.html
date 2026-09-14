@@ -31,7 +31,10 @@
   #btn-sincronizar-agora{margin:0;padding:3px 14px;font-size:.7rem;font-weight:700;background:#fff;color:var(--minimo-texto);border:0;border-radius:12px;cursor:pointer;min-height:var(--toque);}
   #btn-sincronizar-agora:disabled{opacity:.6;cursor:default;}
   main{max-width:640px;margin:0 auto;padding:14px 14px 40px;}
-  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;position:sticky;top:52px;background:var(--bg);padding:8px 0;z-index:9;}
+  /* top acompanha a altura real do header via --header-h (JS, ResizeObserver) em vez de um valor
+     fixo — sem isso, header cresce com a escala de fonte mas as abas continuam grudadas a 52px, e
+     em "A Muito grande" (136%) elas passam a sobrepor o título. */
+  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;position:sticky;top:var(--header-h, 52px);background:var(--bg);padding:8px 0;z-index:9;}
   nav.tabs button{flex:1;border:1px solid var(--borda);background:#fff;padding:9px 6px;border-radius:8px;font-size:.7rem;font-weight:600;cursor:pointer;color:var(--texto-suave);transition:.15s;min-height:var(--toque);}
   nav.tabs button:hover{border-color:var(--verde-claro);color:var(--verde-escuro);}
   nav.tabs button.active{background:var(--verde-escuro);color:#fff;border-color:var(--verde-escuro);}
@@ -75,7 +78,7 @@
   .steps li:last-child{border-bottom:none;}
   .steps li::before{counter-increment:step;content:counter(step);flex:none;width:20px;height:20px;border-radius:50%;background:var(--verde-escuro);color:#fff;font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
   .steps.alt li::before{background:var(--verde-claro);}
-  .checklist-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:0;padding:0;list-style:none;}
+  .checklist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:4px 14px;margin:0;padding:0;list-style:none;}
   .checklist-grid li{font-size:.78rem;color:var(--texto);padding:4px 0 4px 20px;position:relative;line-height:1.35;}
   .checklist-grid li::before{content:"✓";position:absolute;left:0;color:var(--verde-claro);font-weight:800;}
   .tip-card{background:#fff8e6;border:1px solid #f0e0ad;border-radius:10px;padding:12px 14px;font-size:.76rem;line-height:1.5;color:#6b5107;margin-top:10px;}
@@ -92,7 +95,7 @@
   /* Estado não pode depender só de cor */
   .segmented button.on::after{content:" ✓";font-weight:900;}
 
-  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:10px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:10px;margin-top:10px;}
   .kpi{background:#fafbfa;border:1px solid var(--borda);border-radius:9px;padding:12px 8px;text-align:center;}
   .kpi .val{font-size:1.35rem;font-weight:800;color:var(--verde-escuro);}
   .kpi .val.critico{color:var(--critico);} .kpi .val.minimo{color:var(--minimo);} .kpi .val.adequado{color:var(--adequado);}
@@ -172,7 +175,7 @@
 
   /* Painel de pontos já lançados */
   .pontos-lancados{margin-top:14px;border-top:1px solid var(--borda);padding-top:10px;}
-  .pontos-lancados-lista{max-height:170px;overflow-y:auto;}
+  .pontos-lancados-lista{max-height:13rem;overflow-y:auto;}
   .ponto-lancado-item{display:flex;justify-content:space-between;gap:8px;font-size:.74rem;padding:6px 0;border-bottom:1px solid #f0f2f0;color:var(--texto-suave);}
   .ponto-lancado-item b{color:var(--texto);}
   .revisao-item{border:1px solid var(--borda);border-radius:10px;padding:10px;margin-bottom:8px;font-size:.8rem;}
@@ -672,6 +675,6 @@
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-<script type="module" src="/app.js?v=29"></script>
+<script type="module" src="/app.js?v=30"></script>
 </body>
 </html>
