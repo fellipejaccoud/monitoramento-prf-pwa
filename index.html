@@ -35,11 +35,14 @@
      fixo — sem isso, header cresce com a escala de fonte mas as abas continuam grudadas a 52px, e
      em "A Muito grande" (136%) elas passam a sobrepor o título. */
   nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;position:sticky;top:var(--header-h, 52px);background:var(--bg);padding:8px 0;z-index:9;}
-  nav.tabs button{flex:1;border:1px solid var(--borda);background:#fff;padding:9px 6px;border-radius:8px;font-size:.7rem;font-weight:600;cursor:pointer;color:var(--texto-suave);transition:.15s;min-height:var(--toque);}
-  nav.tabs button:hover{border-color:var(--verde-claro);color:var(--verde-escuro);}
-  nav.tabs button.active{background:var(--verde-escuro);color:#fff;border-color:var(--verde-escuro);}
+  /* São páginas de verdade (âncora #view-x), não um widget de abas — por isso <a>, não <button>
+     com role="tab" (que exigiria roving tabindex e navegação por setas). Precisa reset de
+     text-decoration/display porque <a> não herda a aparência de botão como <button> herdava. */
+  nav.tabs a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;border:1px solid var(--borda);background:#fff;padding:9px 6px;border-radius:8px;font-size:.7rem;font-weight:600;cursor:pointer;color:var(--texto-suave);transition:.15s;min-height:var(--toque);}
+  nav.tabs a:hover{border-color:var(--verde-claro);color:var(--verde-escuro);}
+  nav.tabs a[aria-current="page"]{background:var(--verde-escuro);color:#fff;border-color:var(--verde-escuro);}
   /* Estado não pode depender só de cor (aba ativa hoje só mudava de cor de fundo) */
-  nav.tabs button.active::after{content:"";display:block;height:2px;background:currentColor;margin-top:3px;}
+  nav.tabs a[aria-current="page"]::after{content:"";display:block;width:100%;height:2px;background:currentColor;margin-top:3px;}
   .view{display:none;}
   .view.active{display:block;animation:fade .2s ease;}
   @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
@@ -197,13 +200,16 @@
 
   /* Foco visível global — antes só campo de formulário tinha indicação de foco */
   :focus-visible{outline:3px solid var(--verde-escuro);outline-offset:2px;border-radius:4px;}
-  nav.tabs button.active:focus-visible,.btn:focus-visible{outline-color:var(--dourado);}
+  nav.tabs a[aria-current="page"]:focus-visible,.btn:focus-visible{outline-color:var(--dourado);}
   .segmented input:focus-visible + label{outline:3px solid var(--verde-escuro);outline-offset:2px;}
 
   /* Links do login — hoje sem regra nenhuma, apareciam em azul/roxo padrão do navegador, pequenos
      demais (.72rem) pra uso sob sol em campo. */
-  .login-card a{color:var(--verde);font-weight:600;font-size:.85rem;text-underline-offset:2px;display:inline-flex;align-items:center;min-height:var(--toque);}
-  .login-card a:hover{text-decoration-thickness:2px;}
+  /* .link-botao: ações (alternar cadastro/login, esqueci senha) que não navegam pra lugar nenhum —
+     <button> em vez de <a href="#"> + preventDefault(), que é o anti-padrão que este documento
+     evita em todo o resto do app (único <a> com preventDefault é o skip-link, que de fato precisa). */
+  .login-card a,.login-card .link-botao{color:var(--verde);font-weight:600;font-size:.85rem;text-decoration:underline;text-underline-offset:2px;display:inline-flex;align-items:center;min-height:var(--toque);background:none;border:0;padding:0;cursor:pointer;font-family:inherit;}
+  .login-card a:hover,.login-card .link-botao:hover{text-decoration-thickness:2px;}
 
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}
@@ -218,6 +224,9 @@
   .skip-link{position:absolute;left:-9999px;top:0;background:var(--dourado);color:var(--verde-escuro);padding:.75rem 1rem;font-weight:800;z-index:200;border-radius:0 0 8px 0;}
   .skip-link:focus{left:0;}
   #conteudo-principal:focus{outline:none;}
+  /* Título da view recebe foco a cada navegação (menos na primeira, ver aplicarView em app.js) —
+     outline explícito (não só :focus-visible) porque é foco programático, não veio de Tab. */
+  [data-view-title]:focus{outline:3px solid var(--verde-escuro);outline-offset:4px;}
   .fonte-opcoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
   .fonte-btn{margin-top:0;flex:1;min-width:7rem;text-align:center;}
   /* Mesmo raciocínio do segmented (Fase 6): três opções sempre com exatamente uma ativa — radio
@@ -249,8 +258,8 @@
       <button type="submit" class="btn" id="btn-cadastrar" style="width:100%;display:none;">Criar conta</button>
     </form>
     <div id="login-msg" role="alert"></div>
-    <p class="hint" style="text-align:center;margin-top:12px;"><a href="#" id="link-alternar-modo">Ainda não tem conta? Cadastre-se</a></p>
-    <p class="hint" style="text-align:center;"><a href="#" id="link-esqueci-senha">Esqueci minha senha</a></p>
+    <p class="hint" style="text-align:center;margin-top:12px;"><button type="button" class="link-botao" id="link-alternar-modo">Ainda não tem conta? Cadastre-se</button></p>
+    <p class="hint" style="text-align:center;"><button type="button" class="link-botao" id="link-esqueci-senha">Esqueci minha senha</button></p>
     <p class="hint" style="margin-top:14px;"><b>Importante:</b> faça login uma vez com internet — de preferência antes de ir a campo. Depois disso o app continua funcionando offline; só a sincronização com o servidor precisa de sinal.</p>
   </div>
 </div>
@@ -310,19 +319,19 @@
 </div>
 
 <main id="conteudo-principal" tabindex="-1">
-  <nav class="tabs">
-    <button data-view="inicio" class="active">Início</button>
-    <button data-view="processo">Processo</button>
-    <button data-view="ponto">Ponto de Obs.</button>
-    <button data-view="mapa">Mapa</button>
-    <button data-view="metricas">Relatório</button>
+  <nav class="tabs" aria-label="Seções do aplicativo">
+    <a href="#view-inicio" data-view="inicio" aria-current="page">Início</a>
+    <a href="#view-processo" data-view="processo">Processo</a>
+    <a href="#view-ponto" data-view="ponto">Ponto de Obs.</a>
+    <a href="#view-mapa" data-view="mapa">Mapa</a>
+    <a href="#view-metricas" data-view="metricas">Relatório</a>
   </nav>
 
   <!-- INÍCIO -->
   <section id="view-inicio" class="view active">
     <div class="card">
       <p class="eyebrow">Acessibilidade</p>
-      <h2>Tamanho do texto</h2>
+      <h2 data-view-title tabindex="-1">Tamanho do texto</h2>
       <p class="desc">Ajusta o tamanho de todo o texto do app, sem quebrar o layout — útil pra tela do celular em campo, sob sol ou com vista cansada.</p>
       <div class="fonte-opcoes" role="radiogroup" aria-label="Tamanho do texto">
         <input type="radio" id="fonte-padrao" name="fonte" data-fonte="padrao" class="sr-only" checked>
@@ -420,7 +429,7 @@
   <!-- ADICIONAR PROCESSO -->
   <section id="view-processo" class="view">
     <div class="card">
-      <h2 id="processo-form-titulo">Adicionar Processo</h2>
+      <h2 id="processo-form-titulo" data-view-title tabindex="-1">Adicionar Processo</h2>
       <label for="p-editar-select">Corrigir um processo já cadastrado</label>
       <select id="p-editar-select">
         <option value="">— Novo processo —</option>
@@ -493,7 +502,7 @@
   <!-- ADICIONAR PONTO DE OBSERVAÇÃO -->
   <section id="view-ponto" class="view">
     <div class="card">
-      <h2 id="ponto-form-titulo">Adicionar Ponto de Observação</h2>
+      <h2 id="ponto-form-titulo" data-view-title tabindex="-1">Adicionar Ponto de Observação</h2>
       <form id="form-ponto">
         <input type="hidden" id="pt-id-edicao" value="">
         <label for="pt-processo">N. do processo administrativo <span class="req" aria-hidden="true">*</span></label>
@@ -621,7 +630,7 @@
   <!-- MAPA -->
   <section id="view-mapa" class="view">
     <div class="card">
-      <h2>Mapa dos pontos de observação</h2>
+      <h2 data-view-title tabindex="-1">Mapa dos pontos de observação</h2>
       <p class="desc">Importe um arquivo KML com os pontos já distribuídos em campo e/ou o contorno da área de plantio (exportado do seu GPS ou GIS) — o mesmo arquivo pode trazer os dois de uma vez. O mapa fica salvo neste aparelho — depois de abrir uma vez com sinal, continua disponível offline na mesma área.</p>
       <label for="mapa-processo">N. do processo administrativo</label>
       <select id="mapa-processo"></select>
@@ -649,7 +658,7 @@
   <!-- MÉTRICAS / RELATÓRIO -->
   <section id="view-metricas" class="view">
     <div class="card">
-      <h2>Conceito Final</h2>
+      <h2 data-view-title tabindex="-1">Conceito Final</h2>
       <label for="m-processo">N. do processo administrativo</label>
       <select id="m-processo"></select>
 
@@ -708,6 +717,6 @@
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-<script type="module" src="/app.js?v=34"></script>
+<script type="module" src="/app.js?v=35"></script>
 </body>
 </html>

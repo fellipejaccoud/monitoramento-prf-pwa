@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=34';
+import { supabase } from './supabase-client.js?v=35';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=34';
+} from './db.js?v=35';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -167,6 +167,13 @@ function mostrarGate(qual) {
     const gate = document.getElementById(gates[qual]);
     gate.style.display = 'flex';
     requestAnimationFrame(() => { gate.querySelector(FOCUS_GATE[qual])?.focus(); });
+  } else {
+    // Primeira aplicação de view do ciclo de autenticação — sem mover o foco: o app acabou de abrir
+    // pra quem está usando, e jogar o cursor aqui seria tão intrusivo quanto faria no boot. Também
+    // é o que resolve o deep link: um hash tipo #view-metricas aberto sem sessão fica só "guardado"
+    // em location.hash enquanto o gate de login está no ar (hashchange não faz nada com o app
+    // bloqueado, ver listener mais abaixo) e é consumido bem aqui, assim que libera.
+    aplicarView(viewDoHash(), { moverFoco: false });
   }
   // Nenhuma view perde ".active" aqui (o código antigo fazia isso, só ao ABRIR um gate) — com o
   // conteúdo de fundo já coberto por "inert", isso era redundante, e escondia um bug real: como
@@ -332,8 +339,7 @@ function atualizarModoLogin() {
 // aparência visual, não os atributos disabled/required que este JS agora controla).
 atualizarModoLogin();
 
-document.getElementById('link-alternar-modo').addEventListener('click', (e) => {
-  e.preventDefault();
+document.getElementById('link-alternar-modo').addEventListener('click', () => {
   modoCadastro = !modoCadastro;
   atualizarModoLogin();
 });
@@ -388,8 +394,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
   if (modoCadastro) await fazerCadastro(); else await fazerLogin();
 });
 
-document.getElementById('link-esqueci-senha').addEventListener('click', async (e) => {
-  e.preventDefault();
+document.getElementById('link-esqueci-senha').addEventListener('click', async () => {
   const email = document.getElementById('login-email').value.trim();
   const msgEl = document.getElementById('login-msg');
   if (!email) { msgEl.innerHTML = '<div class="msg erro">Digite seu e-mail no campo acima primeiro.</div>'; return; }
@@ -448,15 +453,42 @@ document.querySelector('.skip-link').addEventListener('click', (e) => {
   document.getElementById('conteudo-principal').focus();
 });
 
-// ---------- Navegação entre views ----------
-document.querySelectorAll('nav.tabs button').forEach((btn) => {
-  btn.addEventListener('click', () => irPara(btn.dataset.view));
-});
-function irPara(nome) {
+// ---------- Navegação entre views (links reais + hash, Fase 7 do plano de acessibilidade) ----------
+// São páginas de verdade da aplicação, não um widget de abas — por isso <a href="#view-x"> em vez
+// de <button role="tab"> (que exigiria roving tabindex e navegação por setas próprias). Com <a>
+// reais, o próprio navegador já grava a entrada no histórico e dispara "hashchange" sozinho: nada de
+// pushState/replaceState/popstate aqui, que duplicariam entradas e divergiriam do hash (pushState
+// não dispara hashchange nem popstate). Único ponto de navegação programática é navegarPara(), que
+// só altera o hash — quem aplica a view de fato é sempre o listener de "hashchange", seja o clique
+// no link ou uma chamada interna do código.
+const VIEWS_VALIDAS = ['inicio', 'processo', 'ponto', 'mapa', 'metricas'];
+
+function viewDoHash() {
+  const nome = (location.hash || '').replace('#view-', '');
+  return VIEWS_VALIDAS.includes(nome) ? nome : 'inicio';
+}
+
+function navegarPara(nome) {
+  const alvo = VIEWS_VALIDAS.includes(nome) ? nome : 'inicio';
+  if (viewDoHash() === alvo) {
+    // Hash já é o mesmo (ex.: já estou na aba e algo pede pra "ir" pra ela de novo) — nesse caso
+    // não dispara hashchange sozinho, então aplica direto.
+    if (appLiberado) aplicarView(alvo, { moverFoco: true });
+    return;
+  }
+  location.hash = `#view-${alvo}`;
+}
+
+// Aplica de fato uma view: alterna .active das seções e aria-current dos links, e preserva TODOS os
+// efeitos colaterais que existiam no antigo irPara(). moverFoco=false na primeira aplicação (logo
+// depois do login) — jogar o cursor ali seria tão intrusivo quanto no boot; nas navegações
+// seguintes, moverFoco=true leva o foco pro título da nova seção.
+function aplicarView(nome, { moverFoco = false } = {}) {
   document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
-  document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('nav.tabs a').forEach((a) => a.removeAttribute('aria-current'));
   document.getElementById(`view-${nome}`).classList.add('active');
-  document.querySelector(`nav.tabs button[data-view="${nome}"]`).classList.add('active');
+  document.querySelector(`nav.tabs a[data-view="${nome}"]`).setAttribute('aria-current', 'page');
+
   if (nome === 'processo') carregarProcessosEdicao();
   // Recarrega a lista de pontos do KML toda vez que a aba abre, mesmo sem trocar de processo —
   // sem isso, importar um KML pela aba Mapa enquanto o processo já estava selecionado aqui deixava
@@ -471,7 +503,25 @@ function irPara(nome) {
   // Sai da aba Mapa com a navegação ligada = desperdício de bateria de GPS em campo sem
   // necessidade nenhuma (watchPosition continuaria rodando escondido).
   if (nome !== 'mapa') pararNavegacao();
+
+  if (moverFoco) {
+    requestAnimationFrame(() => {
+      document.querySelector(`#view-${nome} [data-view-title]`)?.focus();
+    });
+  }
 }
+
+// Links não recebem preventDefault() — a navegação nativa acontece (grava histórico sozinha) e só
+// reagimos ao hashchange resultante. Única exceção do app inteiro é o skip-link (não é navegação de
+// rota, não deve tocar no hash).
+window.addEventListener('hashchange', () => {
+  // Com o app ainda bloqueado (gate aberto), o hash muda mas fica só como intenção — nenhum efeito
+  // colateral roda até a autenticação liberar o shell (mostrarGate(null) então aplica a view atual
+  // do hash). #app-shell já está "inert" nesse momento, então o foco nem entraria no conteúdo de
+  // qualquer forma — esta é a segunda barreira, a que impede os efeitos colaterais em si.
+  if (!appLiberado) return;
+  aplicarView(viewDoHash(), { moverFoco: true });
+});
 
 // ---------- Cálculos do protocolo DAR (Manual INEA 2016 + Anexo II) ----------
 function calcularPontos(area) {
@@ -1430,10 +1480,10 @@ async function carregarRevisaoPontos(processoId) {
     btn.addEventListener('click', async () => {
       const p = pendentes.find((x) => x.id === btn.dataset.id);
       if (!p) return;
-      irPara('ponto');
-      // irPara('ponto') recarrega o select de processos de forma assíncrona (local+remoto) — sem
-      // esperar isso aqui, preencherFormPonto setaria o .value antes das <option> existirem e a
-      // seleção do processo se perderia.
+      navegarPara('ponto');
+      // aplicarView('ponto') (disparada pelo hashchange acima) recarrega o select de processos de
+      // forma assíncrona (local+remoto) — sem esperar isso aqui de novo, preencherFormPonto setaria
+      // o .value antes das <option> existirem e a seleção do processo se perderia.
       await carregarProcessosNoSelect('#pt-processo');
       await preencherFormPonto(p);
     });
