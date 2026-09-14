@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=30';
+import { supabase } from './supabase-client.js?v=31';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=30';
+} from './db.js?v=31';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -31,7 +31,7 @@ const IDS_OBRIGATORIOS = [
   'login-confirma-wrap', 'login-senha-confirma', 'btn-login', 'btn-cadastrar', 'login-msg',
   'link-alternar-modo', 'link-esqueci-senha', 'btn-logout', 'form-perfil-inicial',
   'btn-verificar-aprovacao', 'form-nova-senha', 'pendentes-badge', 'pendentes-badge-texto',
-  'btn-sincronizar-agora',
+  'btn-sincronizar-agora', 'app-shell', 'conteudo-principal',
   // Perfil do técnico
   'form-tecnico', 't-nome', 't-matricula', 't-setor', 't-formacao',
   // Processo
@@ -135,17 +135,42 @@ function preencherFormPerfil(p) {
   document.getElementById('t-formacao').value = p.formacao || '';
 }
 
+// Foco vai pro primeiro campo de cada gate assim que ele abre — hoje não existia NENHUMA chamada
+// .focus() no app inteiro, então TalkBack/teclado abriam um gate sem noção nenhuma de onde estavam.
+const FOCUS_GATE = {
+  login: '#login-email',
+  perfil: '#pf-nome',
+  aguardando: '#btn-verificar-aprovacao',
+  novaSenha: '#ns-senha'
+};
+
+// Espelha se o app está liberado (nenhum gate aberto) ou bloqueado. Consumida pela Fase 7
+// (navegarPara/hashchange) pra decidir se uma troca de aba deve mover o foco — definida nos DOIS
+// sentidos (não só quando libera) pra nunca ficar presa em true depois do primeiro login.
+let appLiberado = false;
+
 function mostrarGate(qual) {
   const gates = { login: 'login-gate', perfil: 'perfil-gate', aguardando: 'aguardando-gate', novaSenha: 'nova-senha-gate' };
   Object.values(gates).forEach((id) => { document.getElementById(id).style.display = 'none'; });
-  const nav = document.querySelector('nav.tabs');
+
+  // #app-shell cobre header/user-bar/badge/main/footer — os 4 gates ficam FORA dele (irmãos no
+  // HTML), então inert desativa só o conteúdo de fundo, nunca o gate que está aberto. Isso substitui
+  // de vez o "nav.style.display='none'" antigo (nav já está dentro do shell) e resolve de graça o
+  // botão "Sair" (#user-bar, também dentro do shell) ficar tabulável atrás do gate.
+  const shell = document.getElementById('app-shell');
+  shell.inert = !!qual;
+  appLiberado = !qual;
+
   if (qual) {
-    document.getElementById(gates[qual]).style.display = 'flex';
-    nav.style.display = 'none';
-    document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
-  } else {
-    nav.style.display = '';
+    const gate = document.getElementById(gates[qual]);
+    gate.style.display = 'flex';
+    requestAnimationFrame(() => { gate.querySelector(FOCUS_GATE[qual])?.focus(); });
   }
+  // Nenhuma view perde ".active" aqui (o código antigo fazia isso, só ao ABRIR um gate) — com o
+  // conteúdo de fundo já coberto por "inert", isso era redundante, e escondia um bug real: como
+  // mostrarGate(null) nunca reativava nenhuma view, um login sem sessão em cache (que passa por
+  // mostrarGate('login') primeiro) deixava a tela em branco depois de logar, até a pessoa clicar
+  // numa aba manualmente. Não mexer na ".active" corrige os dois de uma vez.
 }
 
 async function atualizarUiAuth(session) {
@@ -401,6 +426,14 @@ function mostrarMsg(elId, html, ms = 4000) {
   el.innerHTML = html;
   el._timer = setTimeout(() => { el.innerHTML = ''; }, ms);
 }
+
+// Único preventDefault em <a> neste app — não é navegação de rota (não altera hash nem histórico),
+// só move o foco pra dentro do conteúdo principal. Com o gate aberto o link fica sob "inert" e não
+// é alcançável por Tab; com o app liberado, é o primeiro elemento focável da página.
+document.querySelector('.skip-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('conteudo-principal').focus();
+});
 
 // ---------- Navegação entre views ----------
 document.querySelectorAll('nav.tabs button').forEach((btn) => {

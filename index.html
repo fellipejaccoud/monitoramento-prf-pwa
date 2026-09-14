@@ -220,16 +220,10 @@
 </head>
 <body>
 
-<header>
-  <h1>Sistema de Monitoramento de PRF</h1>
-</header>
-<div id="user-bar"><span id="user-email"></span><button type="button" id="btn-logout">Sair</button></div>
-<div id="pendentes-badge" role="status" style="display:none;">
-  <span id="pendentes-badge-texto"></span>
-  <button type="button" id="btn-sincronizar-agora">Sincronizar agora</button>
-</div>
-
-<div class="login-gate" id="login-gate">
+<!-- Os 4 gates ficam FORA de #app-shell, como irmãos dele — nunca dentro. Isso é o que garante
+     que "inert" no shell (aplicado quando um gate está aberto) desative o conteúdo de fundo sem
+     desativar o próprio gate junto. -->
+<div class="login-gate" id="login-gate" role="dialog" aria-modal="true" aria-labelledby="login-titulo">
   <div class="login-card">
     <h2 id="login-titulo">Entrar</h2>
     <p class="desc" id="login-desc">Digite seu e-mail e senha. Qualquer e-mail serve, não precisa ser institucional.</p>
@@ -252,9 +246,9 @@
   </div>
 </div>
 
-<div class="login-gate" id="nova-senha-gate" style="display:none;">
+<div class="login-gate" id="nova-senha-gate" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="ns-titulo">
   <div class="login-card">
-    <h2>Defina sua nova senha</h2>
+    <h2 id="ns-titulo">Defina sua nova senha</h2>
     <p class="desc">Você clicou num link de redefinição de senha. Escolha uma senha nova antes de continuar.</p>
     <form id="form-nova-senha">
       <label for="ns-senha">Nova senha</label>
@@ -267,9 +261,9 @@
   </div>
 </div>
 
-<div class="login-gate" id="perfil-gate" style="display:none;">
+<div class="login-gate" id="perfil-gate" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="perfil-titulo">
   <div class="login-card">
-    <h2>Complete seu cadastro</h2>
+    <h2 id="perfil-titulo">Complete seu cadastro</h2>
     <p class="desc">Só na primeira vez — esses dados entram automaticamente na assinatura de cada relatório gerado.</p>
     <form id="form-perfil-inicial">
       <label for="pf-nome">Nome completo <span class="req" aria-hidden="true">*</span></label>
@@ -286,16 +280,27 @@
   </div>
 </div>
 
-<div class="login-gate" id="aguardando-gate" style="display:none;">
+<div class="login-gate" id="aguardando-gate" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="aguardando-titulo">
   <div class="login-card">
-    <h2>Cadastro enviado</h2>
+    <h2 id="aguardando-titulo">Cadastro enviado</h2>
     <p class="desc">Seu acesso está aguardando aprovação de um administrador. Assim que for liberado, você consegue entrar normalmente — não precisa se cadastrar de novo.</p>
     <button type="button" class="btn secundario" id="btn-verificar-aprovacao" style="width:100%;">Verificar novamente</button>
     <div id="aguardando-msg" role="status"></div>
   </div>
 </div>
 
-<main>
+<div id="app-shell">
+<a href="#conteudo-principal" class="skip-link">Pular para o conteúdo</a>
+<header>
+  <h1>Sistema de Monitoramento de PRF</h1>
+</header>
+<div id="user-bar"><span id="user-email"></span><button type="button" id="btn-logout">Sair</button></div>
+<div id="pendentes-badge" role="status" style="display:none;">
+  <span id="pendentes-badge-texto"></span>
+  <button type="button" id="btn-sincronizar-agora">Sincronizar agora</button>
+</div>
+
+<main id="conteudo-principal" tabindex="-1">
   <nav class="tabs">
     <button data-view="inicio" class="active">Início</button>
     <button data-view="processo">Processo</button>
@@ -666,6 +671,7 @@
 
   <footer>Monitoramento de PRF — PWA · protocolo DAR/INEA</footer>
 </main>
+</div>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.min.js"></script>
@@ -675,6 +681,6 @@
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-<script type="module" src="/app.js?v=30"></script>
+<script type="module" src="/app.js?v=31"></script>
 </body>
 </html>
