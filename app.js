@@ -5,14 +5,63 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=24';
+import { supabase } from './supabase-client.js?v=25';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=24';
+} from './db.js?v=25';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
+}
+
+// ---------- Blindagem de boot: index.html e app.js precisam ser da mesma revisão ----------
+// Sem isso, um index.html desatualizado servido do cache (ver comentário no topo do arquivo) faz o
+// primeiro document.getElementById(id-que-não-existe) lançar TypeError e travar o módulo inteiro
+// silenciosamente — nenhum listener abaixo chega a ser registrado (login, ponto, mapa, export, nada),
+// e pra quem está com o app aberto isso aparece só como "o botão não faz nada", sem pista nenhuma.
+// Lista levantada varrendo o próprio app.js por getElementById que roda ANTES de qualquer listener
+// (nível superior do módulo — logins, gates, form-tecnico, e as chamadas imediatas de
+// createSpeciesPicker/preencherFormPerfil, que também quebrariam o boot se o id não existisse) mais
+// os pontos de entrada de cada aba (Processo, Ponto, Mapa, Relatório), que travariam a primeira vez
+// que alguém abrisse aquela aba com um HTML incompatível.
+const IDS_OBRIGATORIOS = [
+  // Login / cadastro / gates
+  'login-email', 'login-senha', 'btn-login', 'btn-cadastrar', 'link-alternar-modo',
+  'link-esqueci-senha', 'btn-logout', 'form-perfil-inicial', 'btn-verificar-aprovacao',
+  'form-nova-senha',
+  // Perfil do técnico
+  'form-tecnico', 't-nome', 't-matricula', 't-setor', 't-formacao',
+  // Processo
+  'p-area', 'p-num-pontos', 'p-editar-select', 'btn-cancelar-edicao-processo',
+  'form-processo', 'btn-salvar-processo',
+  // Ponto de observação (inclui os pickers de espécie, cuja construção roda no boot)
+  'pt-processo', 'pt-kml-select', 'btn-gps', 'form-ponto', 'btn-salvar-ponto',
+  'btn-cancelar-edicao-ponto', 'ponto-form-titulo', 'pt-id-edicao',
+  'pt-fauna-busca', 'pt-fauna-lista', 'pt-fauna-chips',
+  'pt-vegetal-busca', 'pt-vegetal-lista', 'pt-vegetal-chips',
+  // Mapa
+  'mapa-processo', 'mapa-kml', 'mapa-leaflet', 'btn-goto-point', 'btn-parar-navegacao',
+  // Relatório
+  'm-processo', 'm-revisao-card', 'm-revisao-lista', 'm-revisao-msg', 'btn-confirmar-todos-pontos',
+  'm-fotos', 'btn-limpar-fotos', 'btn-exportar-pdf', 'btn-exportar-excel'
+];
+const idsFaltando = IDS_OBRIGATORIOS.filter((id) => !document.getElementById(id));
+if (idsFaltando.length) {
+  document.body.insertAdjacentHTML('afterbegin',
+    `<div role="alert" style="position:fixed;inset:0 0 auto 0;z-index:9999;padding:16px;background:#b02a2a;color:#fff;font:600 .9rem/1.4 system-ui,sans-serif;">
+       Versão incompatível do aplicativo (faltam: ${idsFaltando.join(', ')}).
+       Feche e reabra o app com internet para atualizar.
+     </div>`);
+  throw new Error(`[boot] HTML incompatível com este app.js — faltam ids: ${idsFaltando.join(', ')}`);
+}
+
+// Só para elementos genuinamente opcionais (condicionais, conveniência) — controles do fluxo
+// principal entram em IDS_OBRIGATORIOS acima, nunca aqui.
+function onOpcional(id, evento, handler) {
+  const el = document.getElementById(id);
+  if (!el) { console.warn(`[boot] elemento opcional ausente: #${id}`); return; }
+  el.addEventListener(evento, handler);
 }
 
 // ---------- Acessibilidade — tamanho do texto ----------

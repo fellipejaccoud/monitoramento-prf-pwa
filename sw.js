@@ -1,12 +1,14 @@
-const CACHE_NAME = 'monitoramento-prf-v20';
+const CACHE_NAME = 'monitoramento-prf-v21';
 const TILE_CACHE = 'monitoramento-prf-tiles-v1';
-const SHELL_FILES = ['/', '/manifest.json', '/icon.svg', '/app.js?v=24', '/db.js?v=24', '/supabase-client.js?v=24', '/especies.json'];
+const SHELL_FILES = ['/', '/manifest.json', '/icon.svg', '/app.js?v=25', '/db.js?v=25', '/supabase-client.js?v=25', '/especies.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
   );
-  self.skipWaiting();
+  // Sem skipWaiting(): o SW novo fica esperando (comportamento padrão) até todas as abas do app
+  // fecharem, em vez de assumir na hora. Assumir imediatamente trocaria a versão do app debaixo de
+  // quem está no meio de um lançamento de ponto em campo — justamente o "hot update" que não queremos.
 });
 
 self.addEventListener('activate', (event) => {
