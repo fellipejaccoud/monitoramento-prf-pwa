@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=35';
+import { supabase } from './supabase-client.js?v=36';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=35';
+} from './db.js?v=36';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -426,6 +426,13 @@ const escaparTexto = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const escaparAtributo = (s) => escaparTexto(s)
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// Separador decimal consistente (Fase 8 do plano de acessibilidade) — toFixed(2) sempre produz
+// ponto ("5.81"), mas o "1,43" (Fator) estático no HTML está em português. Num relatório que vai
+// pra processo administrativo do INEA isso destoa. Usar em todo ponto de EXIBIÇÃO em tela/PDF — não
+// no Excel, que grava número de verdade e o próprio Excel formata sozinho conforme o idioma da
+// planilha.
+const fmtDecimal = (n) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Vários pontos do app recriam uma região inteira do DOM a cada interação (renderMosaico, render()
 // dos pickers de espécie) — sem restaurar o foco depois, ele volta pro <body>, e quem navega só por
@@ -1179,7 +1186,7 @@ async function atualizarConceitoParcial() {
   const metricas = await calcularMetricasProcesso(processoId);
   if (!metricas) { el.textContent = 'Conceito parcial: ainda sem pontos avaliados neste processo.'; return; }
   const cls = classificarConceito(metricas.conceito);
-  el.textContent = `Conceito parcial com ${metricas.pontos.length} ponto(s) já avaliado(s): ${metricas.conceito.toFixed(2)} — ${cls.texto} (o valor final consolidado fica na aba Relatório).`;
+  el.textContent = `Conceito parcial com ${metricas.pontos.length} ponto(s) já avaliado(s): ${fmtDecimal(metricas.conceito)} — ${cls.texto} (o valor final consolidado fica na aba Relatório).`;
 }
 
 // Atrativos de fauna e Riqueza aparente não são mais digitados como número — são derivados da
@@ -1211,7 +1218,7 @@ async function atualizarPontosLancados() {
   lista.innerHTML = pontos.map((p, i) => {
     const soma = Object.keys(PARAMS_DIRETOS).reduce((a, k) => a + p[k], 0);
     const hora = new Date(p.avaliado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    return `<div class="ponto-lancado-item"><span><b>Ponto ${i + 1}</b> — ${hora}</span><span>soma direta: ${soma.toFixed(2)}</span></div>`;
+    return `<div class="ponto-lancado-item"><span><b>Ponto ${i + 1}</b> — ${hora}</span><span>soma direta: ${fmtDecimal(soma)}</span></div>`;
   }).join('');
 }
 
@@ -1420,8 +1427,8 @@ async function atualizarMetricas() {
   }
 
   const cls = classificarConceito(metricas.conceito);
-  document.getElementById('m-media').textContent = metricas.mediaSomatorios.toFixed(2);
-  document.getElementById('m-conceito').textContent = metricas.conceito.toFixed(2);
+  document.getElementById('m-media').textContent = fmtDecimal(metricas.mediaSomatorios);
+  document.getElementById('m-conceito').textContent = fmtDecimal(metricas.conceito);
   document.getElementById('m-conceito').className = 'val ' + cls.classe;
   document.getElementById('m-pontos').textContent = processo ? `${metricas.pontos.length} / ${processo.num_pontos}` : metricas.pontos.length;
 
@@ -1468,7 +1475,7 @@ async function carregarRevisaoPontos(processoId) {
     const hora = new Date(p.avaliado_em).toLocaleString('pt-BR');
     const coords = (p.latitude != null && p.longitude != null) ? `${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}` : 'sem coordenada registrada';
     return `<div class="revisao-item">
-      <div class="resumo"><b>Ponto avaliado em ${hora}</b><br>Soma direta dos 5 parâmetros: ${soma.toFixed(2)} · ${coords}${p.observacoes ? `<br>${escaparTexto(p.observacoes)}` : ''}</div>
+      <div class="resumo"><b>Ponto avaliado em ${hora}</b><br>Soma direta dos 5 parâmetros: ${fmtDecimal(soma)} · ${coords}${p.observacoes ? `<br>${escaparTexto(p.observacoes)}` : ''}</div>
       <div class="acoes">
         <button type="button" class="btn secundario btn-editar-ponto-revisao" data-id="${p.id}">Editar</button>
         <button type="button" class="btn btn-enviar-ponto-revisao" data-id="${p.id}">Confirmar e enviar</button>
@@ -2367,7 +2374,7 @@ document.getElementById('btn-exportar-pdf').addEventListener('click', async () =
     if (y > 245) { doc.addPage(); y = 16; }
     doc.autoTable({
       head: [['', ...chunk.map((l) => `${l.n}`)]],
-      body: [['Soma das notas', ...chunk.map((l) => l.somatorio.toFixed(2))]],
+      body: [['Soma das notas', ...chunk.map((l) => fmtDecimal(l.somatorio))]],
       startY: y, margin: { left: 14, right: 14 }, styles: { fontSize: 8, halign: 'center' },
       columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 34 } },
       headStyles: { fillColor: [212, 172, 13], textColor: '#1b4332' },
@@ -2396,7 +2403,7 @@ document.getElementById('btn-exportar-pdf').addEventListener('click', async () =
   doc.setFontSize(12);
   doc.setFont(undefined, 'bold');
   doc.setTextColor(cls.classe === 'adequado' ? '#1b4332' : cls.classe === 'minimo' ? '#b8860b' : '#b23a2c');
-  doc.text(`Conceito final: ${metricas.conceito.toFixed(2)} — ${cls.texto}${metricas.apto ? ' (apto para quitação)' : ''}`, 14, y);
+  doc.text(`Conceito final: ${fmtDecimal(metricas.conceito)} — ${cls.texto}${metricas.apto ? ' (apto para quitação)' : ''}`, 14, y);
   doc.setFont(undefined, 'normal');
   doc.setTextColor('#000000');
   doc.setFontSize(9);
@@ -2547,7 +2554,7 @@ document.getElementById('btn-exportar-pdf').addEventListener('click', async () =
   }
 });
 
-// ---------- Mapa — importação de KML e "Go to point" ----------
+// ---------- Mapa — importação de KML e "Ir para o ponto" ----------
 // Pontos do KML ficam só no IndexedDB deste aparelho (kml_pontos) — são uma referência de
 // navegação em campo, não fazem parte do protocolo DAR, então não sincronizam com o Supabase.
 let mapaLeaflet = null;
@@ -2569,7 +2576,7 @@ function distanciaMetros(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 function formatarDistancia(m) {
-  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+  return m < 1000 ? `${Math.round(m)} m` : `${fmtDecimal(m / 1000)} km`;
 }
 
 function pararNavegacao() {

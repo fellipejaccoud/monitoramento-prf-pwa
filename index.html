@@ -643,11 +643,11 @@
           <select id="mapa-goto"><option value="">Selecione um ponto</option></select>
         </div>
         <div style="display:flex;align-items:flex-end;">
-          <button type="button" class="btn secundario" id="btn-goto-point" style="width:100%;margin-top:0;">Go to point</button>
+          <button type="button" class="btn secundario" id="btn-goto-point" style="width:100%;margin-top:0;">Ir para o ponto</button>
         </div>
       </div>
-      <div id="mapa-leaflet"></div>
-      <p class="hint">O ponto de destino aparece em destaque (marcador dourado) até você escolher outro. Contorno roxo = área de plantio (do KML); pino azul = ponto planejado; círculo verde = ponto já avaliado em campo. Use o ícone de camadas no canto do mapa para ligar referências oficiais do INEA/GERGET (APPs, hidrografia, unidades de conservação, uso e cobertura do solo) — desligadas por padrão pra economizar dados em campo.</p>
+      <div id="mapa-leaflet" role="region" aria-label="Mapa dos pontos de observação"></div>
+      <p class="hint">O ponto de destino aparece em destaque (marcador dourado) até você escolher outro. Contorno roxo = área de plantio (do KML); pino azul = ponto planejado; círculo verde = ponto já avaliado em campo. Use o ícone de camadas no canto do mapa para ligar referências oficiais do INEA/GERGET (APPs, hidrografia, unidades de conservação, uso e cobertura do solo) — desligadas por padrão pra economizar dados em campo. O mapa em si não é acessível por teclado/leitor de tela — use o campo "Ir para o ponto" acima para navegar sem depender dele.</p>
       <div id="mapa-navegacao" style="display:none;margin-top:10px;">
         <p class="hint" id="mapa-distancia" style="font-weight:700;font-size:.85rem;color:var(--verde-escuro);"></p>
         <button type="button" class="btn secundario pequeno" id="btn-parar-navegacao">Parar navegação</button>
@@ -717,6 +717,6 @@
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-<script type="module" src="/app.js?v=35"></script>
+<script type="module" src="/app.js?v=36"></script>
 </body>
 </html>
