@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=32';
+import { supabase } from './supabase-client.js?v=33';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=32';
+} from './db.js?v=33';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -683,6 +683,51 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
   let chips = [];
   let excluidas = new Set(); // espécies já contabilizadas em pontos anteriores deste processo
 
+  // ---------- Combobox ARIA (Fase 5 do plano de acessibilidade) ----------
+  // Antes, as sugestões eram <div class="item"> com click, sem ArrowDown/ArrowUp, sem opção ativa,
+  // sem Esc, sem listbox/option — a entrada de espécie por texto livre já era operável por teclado
+  // (Enter), mas o autocomplete/sugestões em si não era nem operável nem exposto a tecnologia
+  // assistiva. Ids das opções precisam ser únicos no documento inteiro porque este picker é
+  // instanciado duas vezes (fauna/vegetal) e as duas listas coexistem na mesma tela — por isso o
+  // prefixo com o próprio listId, que já é único.
+  // Decisão 12.1 (texto livre no autocomplete) ainda não foi tomada pelo usuário — preservado
+  // exatamente como estava (Enter sem opção ativa continua adicionando o texto digitado). Tratar
+  // como entrega separada quando a decisão vier, sem travar esta fase.
+  let matchesAtuais = [];
+  let indiceAtivo = -1;
+  const idOpcao = (i) => `${listId}-opt-${i}`;
+
+  function fecharLista() {
+    list.classList.remove('show');
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+    matchesAtuais = [];
+    indiceAtivo = -1;
+  }
+
+  function renderLista(matches) {
+    matchesAtuais = matches;
+    indiceAtivo = -1;
+    input.removeAttribute('aria-activedescendant');
+    list.innerHTML = matches.length
+      ? matches.map((e, i) => `<div class="item" role="option" id="${idOpcao(i)}" aria-selected="false" data-t="${escaparAtributo(e.texto)}"><div class="cientifico">${escaparTexto(e.c)}</div><div class="popular">${escaparTexto(e.p)}</div></div>`).join('')
+      : '<div class="item" role="option" aria-disabled="true">Nenhuma espécie nova encontrada (as já contadas neste processo ficam de fora da busca) — pressione Enter para adicionar como texto livre, só se for mesmo uma novidade.</div>';
+    list.classList.add('show');
+    input.setAttribute('aria-expanded', 'true');
+  }
+
+  // Move a opção ativa com as setas, sem tirar o foco do input — atualiza aria-activedescendant
+  // (é isso que o leitor de tela anuncia) e rola a opção pra dentro da área visível.
+  function moverOpcaoAtiva(delta) {
+    const itens = list.querySelectorAll('.item[role="option"]:not([aria-disabled])');
+    if (!itens.length) return;
+    if (indiceAtivo >= 0) itens[indiceAtivo]?.setAttribute('aria-selected', 'false');
+    indiceAtivo = (indiceAtivo + delta + itens.length) % itens.length;
+    itens[indiceAtivo].setAttribute('aria-selected', 'true');
+    input.setAttribute('aria-activedescendant', itens[indiceAtivo].id);
+    itens[indiceAtivo].scrollIntoView({ block: 'nearest' });
+  }
+
   function render() {
     chipsEl.innerHTML = chips.map((c, i) =>
       `<span class="chip">${escaparTexto(c)}<button type="button" data-i="${i}" aria-label="Remover espécie ${escaparAtributo(c)}">×</button></span>`).join('');
@@ -709,16 +754,13 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
 
   input.addEventListener('input', async () => {
     const q = input.value.trim().toLowerCase();
-    if (q.length < 2) { list.classList.remove('show'); return; }
+    if (q.length < 2) { fecharLista(); list.innerHTML = ''; return; }
     const especies = await carregarEspecies();
     const matches = especies
       .map((e) => ({ ...e, texto: `${e.c} (${e.p})` }))
       .filter((e) => (e.p.toLowerCase().includes(q) || e.c.toLowerCase().includes(q)) && !excluidas.has(e.texto) && !chips.includes(e.texto))
       .slice(0, 20);
-    list.innerHTML = matches.length
-      ? matches.map((e) => `<div class="item" data-t="${e.texto.replace(/"/g, '&quot;')}"><div class="cientifico">${e.c}</div><div class="popular">${e.p}</div></div>`).join('')
-      : '<div class="item">Nenhuma espécie nova encontrada (as já contadas neste processo ficam de fora da busca) — pressione Enter para adicionar como texto livre, só se for mesmo uma novidade.</div>';
-    list.classList.add('show');
+    renderLista(matches);
   });
 
   list.addEventListener('click', (e) => {
@@ -726,20 +768,41 @@ function createSpeciesPicker(inputId, listId, chipsId, opts = {}) {
     if (!item) return;
     adicionar(item.dataset.t);
     input.value = '';
-    list.classList.remove('show');
+    fecharLista();
   });
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    const listaAberta = list.classList.contains('show');
+    if (e.key === 'ArrowDown') {
+      if (!listaAberta) return;
       e.preventDefault();
-      adicionar(input.value.trim());
+      moverOpcaoAtiva(1);
+    } else if (e.key === 'ArrowUp') {
+      if (!listaAberta) return;
+      e.preventDefault();
+      moverOpcaoAtiva(-1);
+    } else if (e.key === 'Escape') {
+      if (!listaAberta) return;
+      e.preventDefault();
+      fecharLista();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      // Opção ativa (navegada por seta) tem prioridade — vira a forma canônica. Sem opção ativa,
+      // mantém o comportamento atual de texto livre (decisão 12.1 ainda pendente, ver comentário
+      // acima da função).
+      if (indiceAtivo >= 0 && matchesAtuais[indiceAtivo]) {
+        adicionar(matchesAtuais[indiceAtivo].texto);
+      } else {
+        adicionar(input.value.trim());
+      }
       input.value = '';
-      list.classList.remove('show');
+      fecharLista();
     }
+    // Home/End: comportamento normal de texto do input — não interceptar.
   });
 
   document.addEventListener('click', (e) => {
-    if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${listId}`)) list.classList.remove('show');
+    if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${listId}`)) fecharLista();
   });
 
   return {

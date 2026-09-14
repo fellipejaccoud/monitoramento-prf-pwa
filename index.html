@@ -113,7 +113,7 @@
   .autocomplete-list{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--borda);border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,.1);max-height:16rem;overflow-y:auto;z-index:20;display:none;}
   .autocomplete-list.show{display:block;}
   .autocomplete-list .item{padding:8px 11px;font-size:.82rem;cursor:pointer;border-bottom:1px solid #f0f2f0;min-height:var(--toque);display:flex;flex-direction:column;justify-content:center;}
-  .autocomplete-list .item:hover{background:#eef4f1;}
+  .autocomplete-list .item:hover,.autocomplete-list .item[aria-selected="true"]{background:#eef4f1;}
   .autocomplete-list .item .cientifico{font-style:italic;color:var(--verde-escuro);}
   .autocomplete-list .item .popular{color:var(--texto-suave);font-size:.72rem;}
   .chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:8px;}
@@ -512,8 +512,8 @@
           <p class="hint" id="pt-atrativos-acumulado" role="status">Cumulativo do processo até agora: 0 → classificação: Crítica (0)</p>
           <label for="pt-fauna-busca">Espécies com atrativos (flores/frutos) observadas neste ponto</label>
           <div class="autocomplete">
-            <input type="text" id="pt-fauna-busca" placeholder="Buscar por nome popular...">
-            <div class="autocomplete-list" id="pt-fauna-lista"></div>
+            <input type="text" id="pt-fauna-busca" placeholder="Buscar por nome popular..." role="combobox" aria-expanded="false" aria-controls="pt-fauna-lista" aria-autocomplete="list" autocomplete="off">
+            <div class="autocomplete-list" id="pt-fauna-lista" role="listbox"></div>
           </div>
           <div class="chips" id="pt-fauna-chips"></div>
           <p class="hint" id="pt-fauna-ja-observadas"></p>
@@ -545,8 +545,8 @@
           <p class="hint" id="pt-riqueza-acumulado" role="status">Cumulativo do processo até agora: 0 → classificação: Crítica (0)</p>
           <label for="pt-vegetal-busca">Espécies vegetais observadas neste ponto</label>
           <div class="autocomplete">
-            <input type="text" id="pt-vegetal-busca" placeholder="Buscar por nome popular...">
-            <div class="autocomplete-list" id="pt-vegetal-lista"></div>
+            <input type="text" id="pt-vegetal-busca" placeholder="Buscar por nome popular..." role="combobox" aria-expanded="false" aria-controls="pt-vegetal-lista" aria-autocomplete="list" autocomplete="off">
+            <div class="autocomplete-list" id="pt-vegetal-lista" role="listbox"></div>
           </div>
           <div class="chips" id="pt-vegetal-chips"></div>
           <p class="hint" id="pt-vegetal-ja-observadas"></p>
@@ -685,6 +685,6 @@
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-<script type="module" src="/app.js?v=32"></script>
+<script type="module" src="/app.js?v=33"></script>
 </body>
 </html>
