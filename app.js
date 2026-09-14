@@ -5,11 +5,11 @@
 // antes de ir à rede). Bug real encontrado em produção: testes pareciam "não ter efeito" porque o
 // navegador estava servindo app.js antigo do próprio cache, sem sequer consultar o servidor. Bumpar
 // esse número a cada deploy força uma URL nova, que nunca esteve em cache.
-import { supabase } from './supabase-client.js?v=36';
+import { supabase } from './supabase-client.js?v=37';
 import {
   salvarLocal, marcarSincronizado, listarPendentes, listarTodos, contarPendentes,
   salvarTecnico, carregarTecnico, removerLocal, limparTecnico
-} from './db.js?v=36';
+} from './db.js?v=37';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
@@ -2211,7 +2211,7 @@ function gerarInterpretacao(metricas) {
     linhas.push(`Atrativos de fauna: situação mínima (${metricas.totalAtrativos} espécie(s) identificadas) — reforçar com mais espécies zoocóricas nos próximos plantios.`);
   }
   if (metricas.notaRiqueza === 0) {
-    linhas.push(`Riqueza aparente: situação crítica (${metricas.totalRiqueza} espécie(s) arbustivas/arbóreas nativas identificadas no polígono) — enriquecimento florístico recomendado.`);
+    linhas.push(`Riqueza aparente: situação crítica (${metricas.totalRiqueza} espécie(s) vegetais identificadas no polígono) — enriquecimento florístico recomendado.`);
   } else if (metricas.notaRiqueza === 0.65) {
     linhas.push(`Riqueza aparente: situação mínima (${metricas.totalRiqueza} espécie(s) identificadas) — diversificar ainda mais em plantios futuros.`);
   }
